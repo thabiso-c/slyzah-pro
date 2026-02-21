@@ -16,10 +16,10 @@ const THEME = {
 
 const PLANS = [
     { id: 'basic', name: "Basic", price: 0, frequency: "Free", features: ["Standard business listing", "Professional profile page", "Receive requests", "Appear in search", "3 specific regions"], trial: false },
-    { id: 'one_region', name: "One Region", price: 199, frequency: "Monthly", features: ["Be Seen First in your region", "Verified Pro Badge", "Appear in Top 8 local results", "Detailed Weekly Growth Reports"], trial: true },
-    { id: 'three_regions', name: "Three Regions", price: 299, frequency: "Monthly", features: ["Be Seen First in 3 regions", "Verified Pro Badge", "Appear in Top 8 local results", "Detailed Weekly Growth Reports"], trial: true },
-    { id: 'provincial', name: "Provincial", price: 599, frequency: "Monthly", features: ["Coverage for an entire province", "Everything in 'One Region'", "Featured on provincial home", "Priority support", "Advanced analytics"], trial: true, recommended: true },
-    { id: 'multi_province', name: "Multi-Province", price: 1499, frequency: "Monthly", features: ["Unlimited multi-province coverage", "Everything in 'Provincial'", "Verified National Partner", "Unlimited category listings"], trial: true }
+    { id: 'one_region', name: "One Region", price: 199, frequency: "Monthly", features: ["Be Seen First in your region", "Verified Pro Badge", "Appear in Top 8 local results", "Detailed Weekly Growth Reports"], trial: true, comingSoon: true },
+    { id: 'three_regions', name: "Three Regions", price: 299, frequency: "Monthly", features: ["Be Seen First in 3 regions", "Verified Pro Badge", "Appear in Top 8 local results", "Detailed Weekly Growth Reports"], trial: true, comingSoon: true },
+    { id: 'provincial', name: "Provincial", price: 599, frequency: "Monthly", features: ["Coverage for an entire province", "Everything in 'One Region'", "Featured on provincial home", "Priority support", "Advanced analytics"], trial: true, recommended: true, comingSoon: true },
+    { id: 'multi_province', name: "Multi-Province", price: 1499, frequency: "Monthly", features: ["Unlimited multi-province coverage", "Everything in 'Provincial'", "Verified National Partner", "Unlimited category listings"], trial: true, comingSoon: true }
 ];
 
 // Replace with your actual PayFast Merchant ID and Key
@@ -326,13 +326,18 @@ export default function SelectPlan() {
                 {PLANS.map((plan) => (
                     <TouchableOpacity
                         key={plan.id}
-                        style={[styles.planCard, (selectedPlan === plan.id || plan.name === currentTier) && styles.selectedCard, (plan as any).recommended && styles.recommendedCard]}
+                        style={[
+                            styles.planCard,
+                            (selectedPlan === plan.id || plan.name === currentTier) && styles.selectedCard,
+                            (plan as any).recommended && styles.recommendedCard,
+                            (plan as any).comingSoon && styles.disabledCard
+                        ]}
                         onPress={() => handlePlanPress(plan)}
-                        disabled={loading || plan.name === currentTier}
+                        disabled={loading || plan.name === currentTier || (plan as any).comingSoon}
                     >
-                        {(plan as any).recommended && (
-                            <View style={styles.recommendedBadge}>
-                                <Text style={styles.recommendedText}>RECOMMENDED</Text>
+                        {((plan as any).recommended || (plan as any).comingSoon) && (
+                            <View style={[(plan as any).comingSoon ? styles.comingSoonBadge : styles.recommendedBadge]}>
+                                <Text style={[(plan as any).comingSoon ? styles.comingSoonText : styles.recommendedText]}>{(plan as any).comingSoon ? "COMING SOON" : "RECOMMENDED"}</Text>
                             </View>
                         )}
                         <View style={styles.planHeader}>
@@ -353,12 +358,12 @@ export default function SelectPlan() {
                             ))}
                         </View>
 
-                        <View style={styles.selectButton}>
+                        <View style={[styles.selectButton, (plan as any).comingSoon && styles.disabledButton]}>
                             {loading && selectedPlan === plan.id ? (
                                 <ActivityIndicator color={THEME.navy} />
                             ) : (
                                 <Text style={styles.selectButtonText}>
-                                    {getButtonText(plan)}
+                                    {(plan as any).comingSoon ? "COMING SOON" : getButtonText(plan)}
                                 </Text>
                             )}
                         </View>
@@ -396,7 +401,7 @@ export default function SelectPlan() {
                                 <Text style={styles.cancelButtonText}>CANCEL</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.acceptButton, !termsAccepted && styles.disabledButton]}
+                                style={[styles.acceptButton, !termsAccepted && styles.modalDisabledButton]}
                                 onPress={() => {
                                     setTermsVisible(false);
                                     if (pendingPlan) processPlanSelection(pendingPlan);
@@ -461,6 +466,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
     },
+    disabledCard: {
+        opacity: 0.6,
+        borderColor: '#444',
+    },
     selectedCard: {
         borderColor: THEME.gold,
         backgroundColor: 'rgba(255, 215, 0, 0.05)',
@@ -479,6 +488,17 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 18,
         borderBottomLeftRadius: 12,
     },
+    comingSoonBadge: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        backgroundColor: '#666',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderTopRightRadius: 18,
+        borderBottomLeftRadius: 12,
+    },
+    comingSoonText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
     recommendedText: { color: THEME.navy, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
     planHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, flexWrap: 'wrap' },
     planName: { fontSize: 18, fontWeight: '900', color: THEME.white, textTransform: 'uppercase' },
@@ -496,6 +516,9 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
     },
+    disabledButton: {
+        backgroundColor: '#444',
+    },
     selectButtonText: { color: THEME.navy, fontWeight: '900', fontSize: 12, letterSpacing: 1 },
 
     // Modal Styles
@@ -511,6 +534,6 @@ const styles = StyleSheet.create({
     cancelButton: { flex: 1, padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#666', alignItems: 'center' },
     cancelButtonText: { color: '#ccc', fontWeight: 'bold' },
     acceptButton: { flex: 1, backgroundColor: THEME.gold, padding: 15, borderRadius: 12, alignItems: 'center' },
-    disabledButton: { backgroundColor: '#555' },
+    modalDisabledButton: { backgroundColor: '#555' },
     acceptButtonText: { color: THEME.navy, fontWeight: '900' },
 });

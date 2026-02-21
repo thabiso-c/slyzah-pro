@@ -1,40 +1,46 @@
-# Dependencies
 node_modules/
-.pnp
-.pnp.js
-
-# Expo
 .expo/
 dist/
 web-build/
 
-# Native Builds
-android/app/build/
-android/.gradle/
-ios/Pods/
-ios/build/
-
-# Environment Variables
+# Environment variables
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# IDEs
-.idea/
-.vscode/
-.DS_Store
-
-# Certificates & Keys (Recommended to keep private)
+# Secrets and Keys
 *.jks
 *.keystore
 *.p12
 *.key
-# google-services.json
-# GoogleService-Info.plist
+google-services.json
+GoogleService-Info.plist
+fcm-key.json
+slyzah-10d1c-firebase-adminsdk-fbsvc-3aae2e65d9.json
+firebase-sync/serviceAccountKey.json
+
+# System
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Environment variables
+.env
+.env.*
+
+# Secrets and Keys
+*.jks
+*.keystore
+*.p12
+*.key
+google-services.json
+GoogleService-Info.plist
+fcm-key.json
+slyzah-10d1c-firebase-adminsdk-fbsvc-3aae2e65d9.json
+firebase-sync/serviceAccountKey.json
+
+# System
+.DS_Store
+.vscode/
+.DS_Store
+.vscode/
