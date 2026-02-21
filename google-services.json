@@ -9,7 +9,54 @@
       "client_info": {
         "mobilesdk_app_id": "1:155997597456:android:e9aea0ae9a60aa66bc7f95",
         "android_client_info": {
-          "package_name": "com.thabilet.slyzahapp"
+          "package_name": "com.slyzah"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "155997597456-toofvpj1am8d3vqf9fs14uqh7hompoda.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.slyzah",
+            "certificate_hash": "b711dc1a05330750a82f54c7130986a28b55e43b"
+          }
+        },
+        {
+          "client_id": "155997597456-ggdcj9nbkvan6jnp3bmpqdh8qtm9v8er.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDeOynOUHE-VzLhFlgnDju30Jx0PTpETPI"
+        },
+        {
+          "current_key": "AIzaSyAWA_al7dLTOvev0IMoK1qYn5NpkJs-a2I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "155997597456-ggdcj9nbkvan6jnp3bmpqdh8qtm9v8er.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "155997597456-a14t3rlv9k7cul09jebm1uatrcbvg30j.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "slyzah"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:155997597456:android:c10568c5a003e932bc7f95",
+        "android_client_info": {
+          "package_name": "com.slyzah.pro"
         }
       },
       "oauth_client": [
@@ -21,6 +68,9 @@
       "api_key": [
         {
           "current_key": "AIzaSyDeOynOUHE-VzLhFlgnDju30Jx0PTpETPI"
+        },
+        {
+          "current_key": "AIzaSyAWA_al7dLTOvev0IMoK1qYn5NpkJs-a2I"
         }
       ],
       "services": {

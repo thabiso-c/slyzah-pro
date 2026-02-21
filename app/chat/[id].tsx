@@ -1,292 +1,116 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import {
-    addDoc,
-    collection,
-    doc,
-    getDoc,
-    onSnapshot,
-    orderBy,
-    query,
-    serverTimestamp,
-    updateDoc
-} from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc } from 'firebase/firestore';
 import React, { useEffect, useRef, useState } from 'react';
-import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { auth, db } from '../../firebaseConfig';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { auth, db } from '../../lib/firebaseConfig';
 
 const THEME = {
     navy: '#001f3f',
     gold: '#FFD700',
     white: '#FFFFFF',
     gray: '#F3F4F6',
-    placeholder: '#9CA3AF',
 };
 
-export default function UnifiedChatPage() {
-    const router = useRouter();
+export default function ChatScreen() {
     const { id } = useLocalSearchParams();
-    const chatId = Array.isArray(id) ? id[0] : id;
-
+    const router = useRouter();
     const [messages, setMessages] = useState<any[]>([]);
-    const [chatMeta, setChatMeta] = useState<any>(null);
-    const [newMessage, setNewMessage] = useState("");
-    const [user, setUser] = useState<any>(null);
+    const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
-    const [isVendorView, setIsVendorView] = useState(false);
-    const [isTyping, setIsTyping] = useState(false);
     const flatListRef = useRef<FlatList>(null);
+    const user = auth.currentUser;
 
     useEffect(() => {
-        if (!chatId) return;
+        if (!id) return;
 
-        const unsubAuth = auth.onAuthStateChanged(async (u) => {
-            if (!u) {
-                router.replace("/login");
-                return;
-            }
-            setUser(u);
-
-            // 1. Verify Permission & Get Metadata
-            const docRef = doc(db, "chats", chatId);
-
-            const unsubChatMeta = onSnapshot(docRef, async (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    let isAuthorized = false;
-                    let isVendor = false;
-
-                    // 1. Check if user is the customer
-                    if (u.uid === data.customerId) {
-                        isAuthorized = true;
-                    }
-                    // 2. Check if user is the vendor (Direct ID match)
-                    else if (u.uid === data.vendorId) {
-                        isAuthorized = true;
-                        isVendor = true;
-                    }
-                    // 3. Fallback: Check if user OWNS the vendor profile
-                    else {
-                        try {
-                            const profRef = doc(db, "professionals", data.vendorId);
-                            const profSnap = await getDoc(profRef);
-                            if (profSnap.exists() && profSnap.data().uid === u.uid) {
-                                isAuthorized = true;
-                                isVendor = true;
-                            }
-                        } catch (e) { console.error(e); }
-                    }
-
-                    if (!isAuthorized) {
-                        if (loading) {
-                            Alert.alert("Error", "Unauthorized access.");
-                            router.replace("/");
-                        }
-                        return;
-                    }
-
-                    setIsVendorView(isVendor);
-                    setChatMeta(data);
-                    setLoading(false);
-
-                    // Handle Typing Indicator
-                    if (data.typingStatus) {
-                        const isOtherTyping = Object.entries(data.typingStatus).some(([uid, status]) => uid !== u.uid && status === true);
-                        setIsTyping(isOtherTyping);
-                    }
-
-                } else {
-                    Alert.alert("Error", "Chat not found.");
-                    router.replace("/");
-                }
-            });
-
-            return () => unsubChatMeta();
-        });
-
-        // 3. Listen to Messages
         const q = query(
-            collection(db, "chats", chatId, "messages"),
-            orderBy("timestamp", "asc")
+            collection(db, "chats", id as string, "messages"),
+            orderBy("createdAt", "asc")
         );
 
-        const unsubMsgs = onSnapshot(q, (snapshot) => {
-            setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setMessages(msgs);
+            setLoading(false);
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
         });
 
-        return () => { unsubAuth(); unsubMsgs(); };
-    }, [chatId]);
+        return () => unsubscribe();
+    }, [id]);
 
-    // 4. Mark as Read (Heartbeat)
-    useEffect(() => {
-        if (!chatId || !user || !chatMeta) return;
+    const handleSend = async () => {
+        if (!newMessage.trim() || !user || !id) return;
 
-        const markRead = async () => {
-            const field = isVendorView ? "vendorLastRead" : "customerLastRead";
-            await updateDoc(doc(db, "chats", chatId), {
-                [field]: serverTimestamp(),
-                [isVendorView ? "vendorUnreadCount" : "customerUnreadCount"]: 0
-            });
-        };
-        markRead();
-    }, [messages.length, chatId, user, isVendorView]);
-
-    const handleTyping = async (status: boolean) => {
-        if (!user || !chatId) return;
-        await updateDoc(doc(db, "chats", chatId), {
-            [`typingStatus.${user.uid}`]: status
-        });
-    };
-
-    const handleSendMessage = async () => {
-        if (!newMessage.trim() || !user || !chatMeta) return;
-
-        const text = newMessage.trim();
-        setNewMessage("");
-        handleTyping(false);
+        const msgText = newMessage.trim();
+        setNewMessage('');
 
         try {
-            const isVendor = isVendorView;
-            const currentSenderName = isVendor
-                ? (chatMeta.vendorName || "Professional")
-                : (chatMeta.customerName || "Customer");
-
-            // Add Message
-            await addDoc(collection(db, "chats", chatId, "messages"), {
-                text,
+            await addDoc(collection(db, "chats", id as string, "messages"), {
+                text: msgText,
                 senderId: user.uid,
-                senderName: currentSenderName,
-                timestamp: serverTimestamp(),
+                createdAt: serverTimestamp(),
             });
 
-            // Update Chat Meta
-            await updateDoc(doc(db, "chats", chatId), {
-                lastMessage: text,
+            await updateDoc(doc(db, "chats", id as string), {
+                lastMessage: msgText,
                 lastSenderId: user.uid,
                 updatedAt: serverTimestamp(),
-                [isVendor ? "customerUnreadCount" : "vendorUnreadCount"]: (chatMeta[isVendor ? "customerUnreadCount" : "vendorUnreadCount"] || 0) + 1
             });
-
-            // Notify Vendor if I am the customer
-            if (!isVendor) {
-                await addDoc(collection(db, "professionals", chatMeta.vendorId, "notifications"), {
-                    type: "message",
-                    notificationMessage: `New message from ${user.displayName || "Customer"}`,
-                    status: "unread",
-                    createdAt: serverTimestamp(),
-                    chatId: chatId
-                });
-            }
         } catch (error) {
-            console.error("Error sending:", error);
+            console.error("Error sending message:", error);
         }
     };
 
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={THEME.gold} />
+                <ActivityIndicator size="large" color={THEME.navy} />
             </View>
         );
     }
 
-    const otherName = isVendorView ? chatMeta?.customerName : chatMeta?.vendorName;
-    const otherLastRead = isVendorView ? chatMeta?.customerLastRead : chatMeta?.vendorLastRead;
-
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-            {/* HEADER */}
+        <SafeAreaView style={styles.container}>
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color={THEME.navy} />
                 </TouchableOpacity>
-                <View style={styles.headerContent}>
-                    <View style={styles.avatar}>
-                        <Text style={styles.avatarText}>{otherName?.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <View>
-                        <Text style={styles.headerTitle}>{otherName}</Text>
-                        <View style={styles.secureBadge}>
-                            <Ionicons name="shield-checkmark" size={10} color="green" />
-                            <Text style={styles.headerSubtitle}> Secure Connection</Text>
-                        </View>
-                    </View>
-                </View>
+                <Text style={styles.headerTitle}>Chat</Text>
+                <View style={{ width: 24 }} />
             </View>
 
-            {/* MESSAGES */}
-            <FlatList
-                ref={flatListRef}
-                data={messages}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
-                onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                renderItem={({ item }) => {
-                    const isMe = item.senderId === user?.uid || (isVendorView && item.senderId === chatMeta?.vendorId);
-                    const senderName = isMe ? "You" : (otherName || item.senderName || "User");
-
-                    const isRead = isMe && otherLastRead && item.timestamp
-                        ? item.timestamp.toMillis() <= otherLastRead.toMillis()
-                        : false;
-
-                    return (
-                        <View style={[styles.messageRow, isMe ? styles.myMessageRow : styles.otherMessageRow]}>
-                            <View style={{ maxWidth: '80%', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
-                                <Text style={[styles.senderName, isMe ? { color: THEME.navy } : { color: '#999' }]}>{senderName}</Text>
-                                <View style={[styles.bubble, isMe ? styles.myBubble : styles.otherBubble]}>
-                                    <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
-                                        {item.text}
-                                    </Text>
-                                </View>
-                                {item.timestamp?.seconds && (
-                                    <View style={styles.metaRow}>
-                                        <Text style={styles.timeText}>
-                                            {new Date(item.timestamp.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </Text>
-                                        {isMe && (
-                                            <Ionicons
-                                                name={isRead ? "checkmark-done" : "checkmark"}
-                                                size={12}
-                                                color={isRead ? THEME.gold : "#ccc"}
-                                                style={{ marginLeft: 4 }}
-                                            />
-                                        )}
-                                    </View>
-                                )}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+            >
+                <FlatList
+                    ref={flatListRef}
+                    data={messages}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={styles.messagesList}
+                    renderItem={({ item }) => {
+                        const isMe = item.senderId === user?.uid;
+                        return (
+                            <View style={[styles.messageBubble, isMe ? styles.myMessage : styles.theirMessage]}>
+                                <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.theirMessageText]}>
+                                    {item.text}
+                                </Text>
                             </View>
-                        </View>
-                    );
-                }}
-                ListFooterComponent={
-                    isTyping ? <Text style={styles.typingText}>Typing...</Text> : null
-                }
-            />
+                        );
+                    }}
+                />
 
-            {/* INPUT */}
-            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}>
                 <View style={styles.inputContainer}>
                     <TextInput
                         style={styles.input}
-                        placeholder="Type a message..."
                         value={newMessage}
                         onChangeText={setNewMessage}
-                        onFocus={() => handleTyping(true)}
-                        onBlur={() => handleTyping(false)}
-                        multiline
+                        placeholder="Type a message..."
+                        placeholderTextColor="#9CA3AF"
                     />
-                    <TouchableOpacity onPress={handleSendMessage} style={styles.sendButton}>
+                    <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
                         <Ionicons name="send" size={20} color={THEME.white} />
                     </TouchableOpacity>
                 </View>
@@ -297,69 +121,18 @@ export default function UnifiedChatPage() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: THEME.gray },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: THEME.white },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        backgroundColor: THEME.white,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    backButton: { marginRight: 16 },
-    headerContent: { flexDirection: 'row', alignItems: 'center' },
-    avatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: THEME.navy,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 10,
-    },
-    avatarText: { color: THEME.gold, fontWeight: '900' },
-    headerTitle: { fontSize: 14, fontWeight: '900', color: THEME.navy, textTransform: 'uppercase' },
-    secureBadge: { flexDirection: 'row', alignItems: 'center' },
-    headerSubtitle: { fontSize: 10, color: 'green', fontWeight: 'bold', textTransform: 'uppercase' },
-    listContent: { padding: 16 },
-    messageRow: { marginBottom: 16, flexDirection: 'row' },
-    myMessageRow: { justifyContent: 'flex-end' },
-    otherMessageRow: { justifyContent: 'flex-start' },
-    senderName: { fontSize: 10, fontWeight: '900', marginBottom: 4, textTransform: 'uppercase' },
-    bubble: { padding: 12, borderRadius: 20 },
-    myBubble: { backgroundColor: THEME.navy, borderTopRightRadius: 4 },
-    otherBubble: { backgroundColor: THEME.white, borderTopLeftRadius: 4, borderWidth: 1, borderColor: '#eee' },
-    messageText: { fontSize: 14, fontWeight: '600' },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, backgroundColor: THEME.white, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+    backButton: { padding: 5 },
+    headerTitle: { fontSize: 16, fontWeight: '900', color: THEME.navy, textTransform: 'uppercase' },
+    messagesList: { padding: 20, paddingBottom: 20 },
+    messageBubble: { maxWidth: '80%', padding: 12, borderRadius: 20, marginBottom: 10 },
+    myMessage: { alignSelf: 'flex-end', backgroundColor: THEME.navy, borderBottomRightRadius: 4 },
+    theirMessage: { alignSelf: 'flex-start', backgroundColor: THEME.white, borderBottomLeftRadius: 4 },
+    messageText: { fontSize: 14 },
     myMessageText: { color: THEME.white },
-    otherMessageText: { color: THEME.navy },
-    metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, alignSelf: 'flex-end' },
-    timeText: { fontSize: 8, fontWeight: 'bold', color: '#ccc' },
-    typingText: { fontSize: 10, fontWeight: '900', color: '#999', marginLeft: 16, marginBottom: 10, textTransform: 'uppercase' },
-    inputContainer: {
-        flexDirection: 'row',
-        padding: 12,
-        backgroundColor: THEME.white,
-        alignItems: 'center',
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-    },
-    input: {
-        flex: 1,
-        backgroundColor: THEME.gray,
-        borderRadius: 20,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        maxHeight: 100,
-        marginRight: 10,
-        fontSize: 14,
-        color: THEME.navy,
-    },
-    sendButton: {
-        backgroundColor: THEME.navy,
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
+    theirMessageText: { color: THEME.navy },
+    inputContainer: { flexDirection: 'row', padding: 15, backgroundColor: THEME.white, alignItems: 'center', gap: 10 },
+    input: { flex: 1, backgroundColor: THEME.gray, borderRadius: 25, paddingHorizontal: 20, paddingVertical: 12, fontSize: 14, color: THEME.navy },
+    sendButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: THEME.gold, justifyContent: 'center', alignItems: 'center' },
 });

@@ -8,12 +8,12 @@ import { Drawer } from 'expo-router/drawer';
 import * as TaskManager from 'expo-task-manager';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { auth, db } from '../firebaseConfig';
+import { auth, db } from '../lib/firebaseConfig';
 
 const THEME = {
   navy: '#001f3f',
@@ -44,6 +44,40 @@ Notifications.setNotificationHandler({
   }),
 });
 
+async function registerForPushNotificationsAsync() {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+
+  if (Device.isDevice) {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') {
+      console.log('Failed to get push token for push notification!');
+      return;
+    }
+
+    // Fallback to the ID from app.json if Constants.expoConfig is missing
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? '6aa0e2e5-5b29-49f6-af32-9da7657870fc';
+
+    try {
+      return (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    } catch (e) {
+      console.error("Error fetching push token:", e);
+    }
+  }
+  return undefined;
+}
+
 function CustomDrawerContent(props: any) {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
@@ -64,7 +98,7 @@ function CustomDrawerContent(props: any) {
         <View style={styles.drawerHeader}>
           <View style={styles.logoContainer}>
             <Image
-              source={require('../assets/logo6.png')}
+              source={require('../assets/images/splash-icon.png')}
               style={styles.drawerLogo}
               resizeMode="contain"
             />
@@ -95,6 +129,7 @@ export default function RootLayout() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  const responseListener = useRef<Notifications.Subscription>();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -108,48 +143,27 @@ export default function RootLayout() {
     return unsubscribe;
   }, []);
 
-  // Register for Push Notifications
+  // Register for Push Notifications & Save Token
   useEffect(() => {
     if (user) {
       registerForPushNotificationsAsync().then(token => {
         if (token) {
           console.log("Push Token obtained:", token);
-          // Use setDoc with merge to ensure it saves even if doc is missing fields
-          // and to ensure the latest token is always active
+          // 1. Save to Users (General Auth)
           setDoc(doc(db, "users", user.uid), {
             expoPushToken: token,
             lastTokenUpdate: new Date()
-          }, { merge: true }).catch(err => console.log("Error saving push token:", err));
+          }, { merge: true }).catch(err => console.log("Error saving push token to users:", err));
+
+          // 2. Save to Professionals (Vendor Profile)
+          setDoc(doc(db, "professionals", user.uid), {
+            expoPushToken: token,
+            lastTokenUpdate: new Date()
+          }, { merge: true }).catch(err => console.log("Error saving push token to professionals:", err));
         }
       });
     }
   }, [user]);
-
-  async function registerForPushNotificationsAsync() {
-    let token;
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-    }
-
-    if (Device.isDevice) {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      if (finalStatus !== 'granted') {
-        return;
-      }
-      token = (await Notifications.getExpoPushTokenAsync({ projectId: Constants.expoConfig?.extra?.eas?.projectId })).data;
-    }
-    return token;
-  }
 
   // Handle Notification Tap (Cold Start & Background)
   const lastNotificationResponse = Notifications.useLastNotificationResponse();
@@ -184,12 +198,11 @@ export default function RootLayout() {
     const unsubscribe = onSnapshot(doc(db, "users", user.uid), async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        if (data?.role === 'vendor') {
-          await signOut(auth);
-          Alert.alert("Access Denied", "Vendor accounts cannot log into the Client app. Please register a new client account.");
-        } else {
-          setIsTermsAccepted(data?.hasAcceptedTerms === true);
-        }
+                // Only update if the field exists to avoid race conditions with local writes (e.g. push tokens)
+                // creating partial documents before the full user profile syncs.
+                if (data && 'hasAcceptedTerms' in data) {
+                    setIsTermsAccepted(data.hasAcceptedTerms === true);
+                }
       }
       setLoading(false);
     });
@@ -200,17 +213,19 @@ export default function RootLayout() {
   useEffect(() => {
     if (loading) return;
 
-    const inAuthGroup = pathname === '/login';
+    // Public routes that don't require authentication
+    const isPublicRoute = pathname === '/login' || pathname === '/' || pathname === '/register' || pathname === '/forgot-password' || pathname === '/select-plan';
     const inTermsGroup = pathname === '/terms';
+    const inPaymentGroup = pathname === '/select-plan';
 
-    if (!user && !inAuthGroup) {
+    if (!user && !isPublicRoute) {
       // Force login if not authenticated
-      router.replace('/login');
+      router.replace('/');
     } else if (user) {
-      if (!isTermsAccepted && !inTermsGroup) {
+      if (!isTermsAccepted && !inTermsGroup && !inPaymentGroup) {
         router.replace('/terms');
-      } else if (isTermsAccepted && (inAuthGroup || inTermsGroup)) {
-        router.replace('/');
+            } else if (isTermsAccepted && (pathname === '/' || pathname === '/login' || pathname === '/terms')) {
+        router.replace('/dashboard');
       }
     }
   }, [user, isTermsAccepted, loading, pathname]);
@@ -241,17 +256,17 @@ export default function RootLayout() {
         <Drawer.Screen
           name="index"
           options={{
-            drawerLabel: 'Home',
-            title: 'HOME',
-            drawerIcon: ({ color }) => <Ionicons name="home-outline" size={22} color={color} />
+            drawerItemStyle: { display: 'none' }, // Hide Login from Drawer
+            headerShown: false,
+            swipeEnabled: false,
           }}
         />
         <Drawer.Screen
-          name="dashboard"
+          name="dashboard/index"
           options={{
-            drawerLabel: 'My Requests',
-            title: 'MY REQUESTS',
-            drawerIcon: ({ color }) => <Ionicons name="list-outline" size={22} color={color} />
+            drawerLabel: 'Dashboard',
+            title: 'VENDOR DASHBOARD',
+            drawerIcon: ({ color }) => <Ionicons name="grid-outline" size={22} color={color} />
           }}
         />
         <Drawer.Screen
@@ -266,6 +281,24 @@ export default function RootLayout() {
         {/* Hidden Login Route */}
         <Drawer.Screen
           name="login"
+          options={{
+            drawerItemStyle: { display: 'none' },
+            headerShown: false,
+            swipeEnabled: false,
+          }}
+        />
+
+        {/* Vendor Specific Hidden Routes */}
+        <Drawer.Screen
+          name="register"
+          options={{
+            drawerItemStyle: { display: 'none' },
+            headerShown: false,
+            swipeEnabled: false,
+          }}
+        />
+        <Drawer.Screen
+          name="select-plan"
           options={{
             drawerItemStyle: { display: 'none' },
             headerShown: false,

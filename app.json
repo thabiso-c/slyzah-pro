@@ -1,16 +1,20 @@
 {
   "expo": {
-    "name": "Slyzah",
-    "slug": "slyzah-app",
+    "name": "Slyzah Pro",
+    "slug": "slyzah-pro",
+    "scheme": "slyzah-pro",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "slyzah-app",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#001f3f"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "slyzah",
+      "bundleIdentifier": "com.slyzah.pro",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "UIBackgroundModes": [
@@ -20,14 +24,10 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#001f3f",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#001f3f"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "com.thabilet.slyzahapp",
+      "package": "com.slyzah.pro",
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
@@ -35,33 +35,30 @@
       ]
     },
     "web": {
-      "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
       [
-        "expo-splash-screen",
+        "expo-notifications",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#001f3f",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "icon": "./assets/notification-icon.png",
+          "color": "#FFFFFF"
         }
       ],
-      "./plugins/withCustomNotificationSound.js"
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25"
+          }
+        }
+      ]
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "4c351ddb-9675-4bf7-889e-97995c077928"
+        "projectId": "6aa0e2e5-5b29-49f6-af32-9da7657870fc"
       }
     }
   }

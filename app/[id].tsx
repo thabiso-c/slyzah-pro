@@ -26,7 +26,7 @@ import {
     View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { auth, db } from '../firebaseConfig';
+import { auth, db } from '../lib/firebaseConfig';
 
 const THEME = {
     navy: '#001f3f',
@@ -191,6 +191,42 @@ export default function UnifiedChatPage() {
                     chatId: chatId
                 });
             }
+
+            // --- NEW: Send Push Notification to Recipient ---
+            const recipientId = isVendor ? chatMeta.customerId : chatMeta.vendorId;
+            if (recipientId) {
+                const recipientDoc = await getDoc(doc(db, "users", recipientId));
+                if (recipientDoc.exists()) {
+                    const recipientData = recipientDoc.data();
+                    const token = recipientData.expoPushToken;
+
+                    if (token) {
+                        console.log(`Sending push to token: ${token}`);
+                        const response = await fetch('https://exp.host/--/api/v2/push/send', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                to: token,
+                                sound: 'default',
+                                title: currentSenderName,
+                                body: text,
+                                data: { chatId: chatId }, // Used by _layout.tsx to navigate
+                            }),
+                        });
+                        const responseData = await response.json();
+                        console.log("Push notification response:", responseData);
+                        if (responseData.data.status === 'error') {
+                            console.error('Push notification error:', responseData.data.message);
+                            Alert.alert('Push Notification Error', `Could not send notification: ${responseData.data.details?.error}`);
+                        }
+                    } else {
+                        console.log("Recipient does not have a push token.");
+                    }
+                }
+            }
         } catch (error) {
             console.error("Error sending:", error);
         }
@@ -230,8 +266,8 @@ export default function UnifiedChatPage() {
 
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
-                behavior={Platform.OS === "ios" ? "padding" : undefined}
-                keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
             >
                 {/* MESSAGES */}
                 <FlatList

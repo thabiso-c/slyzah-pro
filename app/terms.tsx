@@ -14,7 +14,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { auth, db } from '../firebaseConfig';
+import { auth, db } from '../lib/firebaseConfig';
 
 const { width } = Dimensions.get('window');
 
@@ -52,11 +52,11 @@ export default function TermsScreen() {
                 // This fixes your "No document to update" error
                 await setDoc(doc(db, "users", user.uid), {
                     hasAcceptedTerms: true,
-                    role: 'client', // Automatically ensures they have a role
+                    role: 'vendor', // Automatically ensures they have a role
                     updatedAt: new Date()
                 }, { merge: true });
 
-                router.replace('/');
+                router.replace('/dashboard');
             } else {
                 Alert.alert("Session Error", "Please login again.");
                 router.replace('/login');
@@ -86,7 +86,7 @@ export default function TermsScreen() {
         <View style={styles.container}>
             {/* Header with Integrated Logout */}
             <SafeAreaView style={styles.header}>
-                <Text style={styles.headerTitle}>LEGAL & POLICIES</Text>
+                <Text style={styles.headerTitle}>VENDOR AGREEMENT</Text>
                 <Text style={styles.headerSubtitle}>Please read carefully to continue</Text>
             </SafeAreaView>
 
@@ -97,45 +97,48 @@ export default function TermsScreen() {
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
             >
-                <Section title="1. Terms & Conditions">
+                <Section title="1. Growth Plan Subscription Terms">
                     <Paragraph>
-                        By accessing and using Slyzah, you agree to be bound by these Terms and Conditions. If you do not agree with any part of these terms, you must not use our platform. These terms constitute a legally binding agreement between you and Slyzah (Pty) Ltd.
+                        <Text style={{ fontWeight: 'bold' }}>1.1 Subscription Activation:</Text> All paid tiers (One Region, Provincial, Multi-Province) are billed immediately upon registration. Service access is granted once the first payment is confirmed.
                     </Paragraph>
                     <Paragraph>
-                        Slyzah acts as an intermediary platform connecting users with independent service professionals. We do not directly provide the services offered by vendors.
-                    </Paragraph>
-                </Section>
-
-                <Section title="2. Regulations & Laws (POPI & CPA)">
-                    <Paragraph>
-                        <Text style={{ fontWeight: 'bold' }}>POPI Act Compliance:</Text> We are committed to protecting your personal information in accordance with the Protection of Personal Information Act (POPIA).
+                        <Text style={{ fontWeight: 'bold' }}>1.2 Geographic Limitations:</Text> Vendors are responsible for selecting the correct tier. If a vendor is found to be operating outside their subscribed region, the account may be suspended or limited until the plan is upgraded.
                     </Paragraph>
                     <Paragraph>
-                        <Text style={{ fontWeight: 'bold' }}>Consumer Protection Act (CPA):</Text> Users retain all rights afforded to them under the CPA regarding the quality of services rendered.
+                        <Text style={{ fontWeight: 'bold' }}>1.3 Automatic Billing:</Text> Subscriptions are recurring. Your provided payment method will be debited monthly on the anniversary of your signup date.
                     </Paragraph>
-                </Section>
-
-                <Section title="3. Refund & Return Policy">
                     <Paragraph>
-                        As Slyzah is a connection platform, payments for services are typically made directly to the service professional. Refunds must be negotiated directly with the vendor.
+                        <Text style={{ fontWeight: 'bold' }}>1.4 Cancellation:</Text> You may cancel your subscription at any time via the Vendor Dashboard. Cancellation stops future billing, but no partial refunds are provided for the remaining days of the current cycle.
+                    </Paragraph>
+                    <Paragraph>
+                        <Text style={{ fontWeight: 'bold' }}>1.5 Upgrades:</Text> Moving from One Region to Provincial or Multi-Province takes effect immediately, with a pro-rata charge for the difference in plan pricing.
                     </Paragraph>
                 </Section>
 
-                <Section title="4. Privacy Policy">
+                <Section title="2. Service Standards & Conduct">
                     <Paragraph>
-                        We collect information such as your name, contact details, and location to connect you with relevant professionals.
+                        As a registered professional on Slyzah, you agree to maintain high standards of service. You must treat all customers with respect, provide accurate quotes, and deliver work as agreed.
+                    </Paragraph>
+                    <Paragraph>
+                        Slyzah reserves the right to suspend or terminate accounts that receive consistent negative feedback or violate our community guidelines.
                     </Paragraph>
                 </Section>
 
-                <Section title="5. Delivery & Cancellation">
+                <Section title="3. Lead Management">
                     <Paragraph>
-                        You may cancel a service request at any time before the professional is dispatched. Late cancellations may incur a fee.
+                        Leads provided through the platform are for your exclusive use in quoting. You may not resell or redistribute lead information to third parties.
                     </Paragraph>
                 </Section>
 
-                <Section title="6. About Us">
+                <Section title="4. Payments & Fees">
                     <Paragraph>
-                        Slyzah (Pty) Ltd is South Africa's premier on-demand service marketplace. Our mission is to empower local professionals while providing homeowners with reliable service solutions.
+                        Subscription fees are for access to the platform and leads. Slyzah does not take a commission on jobs won unless explicitly stated in specific promotional campaigns.
+                    </Paragraph>
+                </Section>
+
+                <Section title="5. Liability & Indemnity">
+                    <Paragraph>
+                        Slyzah acts as a connector. You are solely responsible for the quality of your work, safety compliance, and any disputes arising with the customer. You agree to indemnify Slyzah against any claims resulting from your services.
                     </Paragraph>
                 </Section>
 
@@ -159,7 +162,7 @@ export default function TermsScreen() {
                             styles.buttonText,
                             isScrolledToBottom ? styles.buttonTextActive : styles.buttonTextDisabled
                         ]}>
-                            {isScrolledToBottom ? "I ACCEPT ALL TERMS" : "SCROLL TO END TO ACCEPT"}
+                            {isScrolledToBottom ? "I ACCEPT VENDOR TERMS" : "SCROLL TO END TO ACCEPT"}
                         </Text>
                     )}
                 </TouchableOpacity>
