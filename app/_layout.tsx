@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 import * as TaskManager from 'expo-task-manager';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import 'react-native-gesture-handler';
@@ -146,16 +146,22 @@ export default function RootLayout() {
   // Register for Push Notifications & Save Token
   useEffect(() => {
     if (user) {
-      registerForPushNotificationsAsync().then(token => {
+      registerForPushNotificationsAsync().then(async (token) => {
         if (token) {
-          console.log("Push Token obtained:", token);
-          // 1. Save to Users (General Auth)
-          setDoc(doc(db, "users", user.uid), {
-            expoPushToken: token,
-            lastTokenUpdate: new Date()
-          }, { merge: true }).catch(err => console.log("Error saving push token to users:", err));
+          // Check if token is different before writing to save costs
+          const userRef = doc(db, "users", user.uid);
+          const userSnap = await getDoc(userRef);
 
-          // 2. Save to Professionals (Vendor Profile)
+          if (userSnap.exists() && userSnap.data().expoPushToken === token) {
+            console.log("Push token is up to date.");
+            return;
+          }
+
+          console.log("Updating Push Token:", token);
+          // 1. Save to Users (General Auth)
+          setDoc(userRef, { expoPushToken: token, lastTokenUpdate: new Date() }, { merge: true });
+
+          // 2. Save to Professionals (Vendor Profile) - Fire and forget
           setDoc(doc(db, "professionals", user.uid), {
             expoPushToken: token,
             lastTokenUpdate: new Date()
@@ -198,12 +204,15 @@ export default function RootLayout() {
     const unsubscribe = onSnapshot(doc(db, "users", user.uid), async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-                // Only update if the field exists to avoid race conditions with local writes (e.g. push tokens)
-                // creating partial documents before the full user profile syncs.
-                if (data && 'hasAcceptedTerms' in data) {
-                    setIsTermsAccepted(data.hasAcceptedTerms === true);
-                }
+        // Only update if the field exists to avoid race conditions with local writes (e.g. push tokens)
+        // creating partial documents before the full user profile syncs.
+        if (data && 'hasAcceptedTerms' in data) {
+          setIsTermsAccepted(data.hasAcceptedTerms === true);
+        }
       }
+      setLoading(false);
+    }, (error) => {
+      console.error("User snapshot error:", error);
       setLoading(false);
     });
 
@@ -224,7 +233,7 @@ export default function RootLayout() {
     } else if (user) {
       if (!isTermsAccepted && !inTermsGroup && !inPaymentGroup) {
         router.replace('/terms');
-            } else if (isTermsAccepted && (pathname === '/' || pathname === '/login' || pathname === '/terms')) {
+      } else if (isTermsAccepted && (pathname === '/' || pathname === '/login' || pathname === '/terms')) {
         router.replace('/dashboard');
       }
     }

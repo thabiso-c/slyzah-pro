@@ -33,6 +33,15 @@ const timeAgo = (date: any) => {
     return Math.floor(seconds) + "s ago";
 };
 
+const getUrgencyLabel = (urgency: string) => {
+    switch (urgency) {
+        case 'urgent': return 'Urgent';
+        case 'notUrgent': return 'Not Urgent';
+        case 'comparing': return 'Comparing Quotes';
+        default: return urgency;
+    }
+};
+
 export default function VendorDashboard() {
     const router = useRouter();
     const [user, setUser] = useState<any>(null);
@@ -426,6 +435,7 @@ export default function VendorDashboard() {
                                             <Text style={styles.leadCategory}>{lead.category}</Text>
                                             <View style={styles.directBadge}>
                                                 <Text style={styles.directBadgeText}>FOR YOU</Text>
+                                                <Text style={styles.urgencyText}>({getUrgencyLabel(lead.urgency)})</Text>
                                             </View>
                                         </View>
                                         <Text style={styles.leadDescription}>{lead.issueDescription}</Text>
@@ -472,6 +482,7 @@ export default function VendorDashboard() {
                                     <View style={styles.leadHeader}>
                                         <Text style={styles.leadCategory}>{lead.category}</Text>
                                         <Text style={styles.leadTime}>{timeAgo(lead.createdAt)}</Text>
+                                        <Text style={styles.urgencyText}>({getUrgencyLabel(lead.urgency)})</Text>
                                     </View>
                                     <Text style={styles.leadDescription} numberOfLines={2}>{lead.issueDescription}</Text>
                                     <Text style={styles.leadLocation}>📍 {lead.address || `${lead.town}, ${lead.province}`}</Text>
@@ -808,12 +819,15 @@ export default function VendorDashboard() {
             <Modal visible={!!selectedLead} animationType="slide" transparent>
                 <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
                     <View style={styles.modalContent}>
+
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Send Quote</Text>
                             <TouchableOpacity onPress={() => setSelectedLead(null)}>
                                 <Ionicons name="close" size={24} color={THEME.navy} />
                             </TouchableOpacity>
                         </View>
+
+                        <Text style={styles.inputLabel}>Urgency: {getUrgencyLabel(selectedLead?.urgency)}</Text>
 
                         <Text style={styles.modalSubtitle}>Job: {selectedLead?.issueDescription}</Text>
 
@@ -937,6 +951,10 @@ const styles = StyleSheet.create({
     directBadge: { backgroundColor: THEME.gold, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
     directBadgeText: { fontSize: 8, fontWeight: '900', color: THEME.navy },
     leadTime: { fontSize: 10, color: '#9CA3AF' },
+    urgencyText: {
+        fontSize: 10,
+        color: '#9CA3AF',
+    },
     leadDescription: { fontSize: 16, fontWeight: 'bold', color: THEME.navy, marginBottom: 8 },
     leadLocation: { fontSize: 12, color: '#6B7280', marginBottom: 15, fontWeight: '600' },
     imageScroll: { marginBottom: 15, flexDirection: 'row' },

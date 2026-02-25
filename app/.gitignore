@@ -15,32 +15,9 @@ web-build/
 google-services.json
 GoogleService-Info.plist
 fcm-key.json
-slyzah-10d1c-firebase-adminsdk-fbsvc-3aae2e65d9.json
+slyzah-*.json
 firebase-sync/serviceAccountKey.json
 
 # System
-node_modules/
-.expo/
-dist/
-web-build/
-
-# Environment variables
-.env
-.env.*
-
-# Secrets and Keys
-*.jks
-*.keystore
-*.p12
-*.key
-google-services.json
-GoogleService-Info.plist
-fcm-key.json
-slyzah-10d1c-firebase-adminsdk-fbsvc-3aae2e65d9.json
-firebase-sync/serviceAccountKey.json
-
-# System
-.DS_Store
-.vscode/
 .DS_Store
 .vscode/

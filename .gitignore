@@ -41,3 +41,11 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Secrets
+fcm-key.json
+slyzah-*.json
+firebase-sync/serviceAccountKey.json
+google-services.json
+GoogleService-Info.plist
+.env
