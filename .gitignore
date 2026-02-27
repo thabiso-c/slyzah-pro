@@ -49,3 +49,4 @@ firebase-sync/serviceAccountKey.json
 google-services.json
 GoogleService-Info.plist
 .env
+lib/secrets.ts
