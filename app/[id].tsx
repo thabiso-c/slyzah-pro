@@ -240,7 +240,21 @@ export default function UnifiedChatPage() {
                         <Text style={styles.headerTitle}>{otherName}</Text>
                         <View style={styles.secureBadge}>
                             <Ionicons name="shield-checkmark" size={10} color="green" />
-                            <Text style={styles.headerSubtitle}> Secure Connection</Text>
+                            <Text style={styles.headerSubtitle}> Secure</Text>
+                            {chatMeta?.urgency && (
+                                <>
+                                    <Text style={styles.headerSubtitle}> • </Text>
+                                    <Ionicons
+                                        name={chatMeta.urgency === 'urgent' ? "flash" : "time-outline"}
+                                        size={10}
+                                        color={chatMeta.urgency === 'urgent' ? '#EF4444' : '#F59E0B'}
+                                    />
+                                    <Text style={[styles.headerSubtitle, {
+                                        color: chatMeta.urgency === 'urgent' ? '#EF4444' : '#F59E0B',
+                                        marginLeft: 2
+                                    }]}>{chatMeta.urgency}</Text>
+                                </>
+                            )}
                         </View>
                     </View>
                 </View>

@@ -7,12 +7,41 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db, storage } from '../lib/firebaseConfig';
+import { verifyCipcBusiness } from './api_client';
 
 const THEME = {
     navy: '#001f3f',
     gold: '#FFD700',
     white: '#FFFFFF',
     gray: '#F3F4F6',
+};
+const CREDENTIAL_MAPPING: Record<string, { label: string; field: string }> = {
+    "Plumber": { label: "PIRB Licensed", field: "pirbNumber" },
+    "Electrician": { label: "Wireman's License", field: "wiremanNumber" },
+    "Panel Beater": { label: "RMI Member", field: "rmiNumber" },
+    "Builder": { label: "NHBRC Reg", field: "nhbrcNumber" },
+    "Gas": { label: "SAQCC Gas", field: "saqccNumber" },
+    "Air Conditioning": { label: "SARACCA", field: "saraccaNumber" },
+    "CCTV & Security": { label: "PSiRA Reg", field: "psiraNumber" },
+    "Pest Control": { label: "PCO Reg", field: "pcoNumber" },
+    "Appliance Repairs": { label: "Trade Cert", field: "tradeCertNumber" },
+    "Locksmith": { label: "LASA Member", field: "lasaNumber" },
+    "Roofing": { label: "PRA Member", field: "praNumber" },
+    "Gate Motors": { label: "Certified Installer", field: "installerNumber" },
+    "Handyman": { label: "Liability Insurance", field: "liabilityPolicyNumber" },
+    "Solar/Power": { label: "PV Green Card", field: "pvGreenCardNumber" },
+    "Cleaning": { label: "NCCA Member", field: "nccaNumber" },
+    "Automotive": { label: "RMI / MIWA", field: "rmiMiwaNumber" },
+    "Carpenter": { label: "Trade Cert", field: "tradeCertNumber" },
+    "Solar": { label: "PV GreenCard", field: "pvGreenCardNumber" },
+    "Fire Protection": { label: "SAQCC Fire", field: "fireRegNumber" },
+    "Movers": { label: "PMA Member", field: "pmaNumber" },
+    "Mechanic": { label: "MIWA/RMI Member", field: "miwaNumber" },
+    "Auto Glass": { label: "SAGGA Member", field: "saggaNumber" },
+    "Borehole": { label: "BWA Member", field: "bwaNumber" },
+    "Pool Services": { label: "NSPI Member", field: "nspiNumber" },
+    "Tree Felling": { label: "Public Liability", field: "insuranceNumber" },
+    "Solar / EV": { label: "PV GreenCard / EV Cert", field: "pvGreenCardNumber" },
 };
 
 const LOCATION_MAPPING: Record<string, string[]> = {
@@ -35,6 +64,48 @@ const TIER_LIMITS: Record<string, { provinces: number; regions: number }> = {
     'multi-province': { provinces: 9, regions: 999 }
 };
 
+const resolveCredentialMapping = (categoryInput: string) => {
+    if (!categoryInput) return null;
+
+    // 1. Exact Match
+    if (CREDENTIAL_MAPPING[categoryInput]) return CREDENTIAL_MAPPING[categoryInput];
+
+    // 2. Fuzzy / Keyword Match
+    const normalized = categoryInput.toLowerCase();
+
+    const keywords: Record<string, string> = {
+        "plumb": "Plumber",
+        "electr": "Electrician",
+        "carpent": "Carpenter",
+        "build": "Builder",
+        "gas": "Gas",
+        "air": "Air Conditioning",
+        "condition": "Air Conditioning",
+        "security": "CCTV & Security",
+        "cctv": "CCTV & Security",
+        "pest": "Pest Control",
+        "appliance": "Appliance Repairs",
+        "lock": "Locksmith",
+        "roof": "Roofing",
+        "gate": "Gate Motors",
+        "solar": "Solar/Power",
+        "power": "Solar/Power",
+        "clean": "Cleaning",
+        "auto": "Automotive",
+        "mechanic": "Automotive",
+        "panel": "Panel Beater",
+        "beat": "Panel Beater",
+    };
+
+    for (const [keyword, mapKey] of Object.entries(keywords)) {
+        if (normalized.includes(keyword)) {
+            return CREDENTIAL_MAPPING[mapKey];
+        }
+    }
+
+    return null;
+};
+
 export default function ProfileScreen() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
@@ -54,6 +125,8 @@ export default function ProfileScreen() {
     const [tempProvinces, setTempProvinces] = useState<string[]>([]);
     const [tempRegions, setTempRegions] = useState<string[]>([]);
     const [logoUri, setLogoUri] = useState<string | null>(null);
+    const [cipcVerificationLoading, setCipcVerificationLoading] = useState(false);
+    const [cipcRegNumber, setCipcRegNumber] = useState('');
 
     const isPaidTier = useMemo(() => profile?.tier && profile.tier.toLowerCase() !== 'basic', [profile]);
 
@@ -217,6 +290,35 @@ export default function ProfileScreen() {
         }
     };
 
+    const handleCipcVerification = async () => {
+        setCipcVerificationLoading(true);
+        try {
+            const verificationData = await verifyCipcBusiness(cipcRegNumber);
+
+            const user = auth.currentUser;
+            if (user) {
+                const docRef = doc(db, "professionals", user.uid);
+                await updateDoc(docRef, {
+                    cipcVerified: true,
+                    cipcEnterpriseName: verificationData.enterpriseName,
+                    // You can add more fields from the verificationData here
+                });
+                setProfile({ ...profile, cipcVerified: true, cipcEnterpriseName: verificationData.enterpriseName });
+                Alert.alert("CIPC Verification", "Business successfully verified!");
+            }
+        } catch (error: any) {
+            console.error("CIPC Verification Error:", error);
+            Alert.alert("CIPC Verification Failed", error.message || "Could not verify business. Please check the registration number and try again.");
+        } finally {
+            setCipcVerificationLoading(false);
+        }
+    };
+
+    const handleCipcNumberChange = (text: string) => {
+        setCipcRegNumber(text);
+    };
+
+
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -321,6 +423,45 @@ export default function ProfileScreen() {
                             <Text style={styles.helperText}>Contact support to change category.</Text>
                         </View>
 
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>CIPC Registration Number</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <TextInput
+                                    style={[styles.input, { flex: 1, marginRight: 10 }]}
+                                    placeholder="Enter CIPC Registration Number"
+                                    placeholderTextColor="#999"
+                                    value={cipcRegNumber}
+                                    onChangeText={handleCipcNumberChange}
+                                />
+                                <TouchableOpacity
+                                    style={[styles.editButton, { paddingVertical: 12, paddingHorizontal: 15 }]}
+                                    onPress={handleCipcVerification}
+                                    disabled={cipcVerificationLoading}
+                                >
+                                    {cipcVerificationLoading ? (
+                                        <ActivityIndicator color={THEME.navy} />
+                                    ) : (
+                                        <Text style={styles.editButtonText}>VERIFY NOW</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {profile?.cipcVerified && (
+                            <Text style={{ color: 'green', fontWeight: 'bold', marginTop: -10, marginBottom: 10 }}>✅ CIPC Verified: {profile.cipcEnterpriseName}</Text>
+                        )}
+                        {(() => {
+                            const mapping = profile ? resolveCredentialMapping(profile.category) : null;
+                            if (profile && mapping && profile[mapping.field]) {
+                                return (
+                                    <View style={styles.inputGroup}>
+                                        <Text style={styles.label}>{mapping.label}</Text>
+                                        <Text style={styles.input}>{profile[mapping.field]}</Text>
+                                    </View>
+                                );
+                            }
+                            return null;
+                        })()}
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Service Area</Text>
                             <View style={[styles.readOnlyInput, { flexDirection: 'column', alignItems: 'flex-start', gap: 8 }]}>

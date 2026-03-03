@@ -4,15 +4,87 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db, storage } from '../lib/firebaseConfig';
+import { verifyCipcBusiness } from './api_client';
 
 const THEME = {
     navy: '#001f3f',
     gold: '#FFD700',
     white: '#FFFFFF',
     gray: '#F3F4F6',
+};
+
+const CREDENTIAL_MAPPING: Record<string, { label: string; field: string }> = {
+    "Plumber": { label: "PIRB Licensed", field: "pirbNumber" },
+    "Electrician": { label: "Wireman's License", field: "wiremanNumber" },
+    "Panel Beater": { label: "RMI Member", field: "rmiNumber" },
+    "Builder": { label: "NHBRC Reg", field: "nhbrcNumber" },
+    "Gas": { label: "SAQCC Gas", field: "saqccNumber" },
+    "Air Conditioning": { label: "SARACCA", field: "saraccaNumber" },
+    "CCTV & Security": { label: "PSiRA Reg", field: "psiraNumber" },
+    "Pest Control": { label: "PCO Reg", field: "pcoNumber" },
+    "Appliance Repairs": { label: "Trade Cert", field: "tradeCertNumber" },
+    "Locksmith": { label: "LASA Member", field: "lasaNumber" },
+    "Roofing": { label: "PRA Member", field: "praNumber" },
+    "Gate Motors": { label: "Certified Installer", field: "installerNumber" },
+    "Handyman": { label: "Liability Insurance", field: "liabilityPolicyNumber" },
+    "Solar/Power": { label: "PV Green Card", field: "pvGreenCardNumber" },
+    "Cleaning": { label: "NCCA Member", field: "nccaNumber" },
+    "Automotive": { label: "RMI / MIWA", field: "rmiMiwaNumber" },
+    "Carpenter": { label: "Trade Cert", field: "tradeCertNumber" },
+    "Solar": { label: "PV GreenCard", field: "pvGreenCardNumber" },
+    "Fire Protection": { label: "SAQCC Fire", field: "fireRegNumber" },
+    "Movers": { label: "PMA Member", field: "pmaNumber" },
+    "Mechanic": { label: "MIWA/RMI Member", field: "miwaNumber" },
+    "Auto Glass": { label: "SAGGA Member", field: "saggaNumber" },
+    "Borehole": { label: "BWA Member", field: "bwaNumber" },
+    "Pool Services": { label: "NSPI Member", field: "nspiNumber" },
+    "Tree Felling": { label: "Public Liability", field: "insuranceNumber" },
+    "Solar / EV": { label: "PV GreenCard / EV Cert", field: "pvGreenCardNumber" },
+};
+
+const resolveCredentialMapping = (categoryInput: string) => {
+    if (!categoryInput) return null;
+
+    // 1. Exact Match
+    if (CREDENTIAL_MAPPING[categoryInput]) return CREDENTIAL_MAPPING[categoryInput];
+
+    // 2. Fuzzy / Keyword Match
+    const normalized = categoryInput.toLowerCase();
+
+    const keywords: Record<string, string> = {
+        "plumb": "Plumber",
+        "electr": "Electrician",
+        "carpent": "Carpenter",
+        "build": "Builder",
+        "gas": "Gas",
+        "air": "Air Conditioning",
+        "condition": "Air Conditioning",
+        "security": "CCTV & Security",
+        "cctv": "CCTV & Security",
+        "pest": "Pest Control",
+        "appliance": "Appliance Repairs",
+        "lock": "Locksmith",
+        "roof": "Roofing",
+        "gate": "Gate Motors",
+        "solar": "Solar/Power",
+        "power": "Solar/Power",
+        "clean": "Cleaning",
+        "auto": "Automotive",
+        "mechanic": "Automotive",
+        "panel": "Panel Beater",
+        "beat": "Panel Beater",
+    };
+
+    for (const [keyword, mapKey] of Object.entries(keywords)) {
+        if (normalized.includes(keyword)) {
+            return CREDENTIAL_MAPPING[mapKey];
+        }
+    }
+
+    return null;
 };
 
 const LOCATION_MAPPING: Record<string, string[]> = {
@@ -44,23 +116,29 @@ export default function VendorRegister() {
     const [modalVisible, setModalVisible] = useState(false);
     const [modalType, setModalType] = useState<'province' | 'region'>('province');
     const [logoUri, setLogoUri] = useState<string | null>(null);
+    const [cipcRegNumber, setCipcRegNumber] = useState('');
+    const [cipcVerificationLoading, setCipcVerificationLoading] = useState(false);
+    const [verificationData, setVerificationData] = useState<any>(null);
 
     const [formData, setFormData] = useState({
         businessName: '',
         email: '',
         phone: '',
         category: '',
+        credentialNumber: '',
         description: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        website: '',
     });
 
     const selectedTierId = (params.tier as string) || 'basic';
     const tierRules = TIER_LIMITS[selectedTierId] || TIER_LIMITS['basic'];
+    const credentialMapping = useMemo(() => resolveCredentialMapping(formData.category), [formData.category]);
 
     const handleRegister = async () => {
         if (!formData.businessName || !formData.email || !formData.password || !formData.category || provinces.length === 0 || regions.length === 0) {
-            Alert.alert("Missing Fields", "Please fill in all required fields.");
+            Alert.alert("Missing Fields", "Please fill in all the required fields.");
             return;
         }
 
@@ -85,8 +163,8 @@ export default function VendorRegister() {
                 logoUrl = await getDownloadURL(snapshot.ref);
             }
 
-            // 2. Create Vendor Profile in Firestore
-            await setDoc(doc(db, "professionals", uid), {
+            // 2. Construstruct Vendor Profile Data
+            const vendorData: any = {
                 uid: uid,
                 name: formData.businessName,
                 email: formData.email,
@@ -101,12 +179,27 @@ export default function VendorRegister() {
                 tier: selectedTierId === 'basic' ? 'Basic' : 'Pending Payment',
                 isApproved: false, // Requires admin approval or payment
                 createdAt: serverTimestamp(),
+                website: formData.website,
                 logo: logoUrl,
                 rating: 5.0,
                 reviews: 0
-            });
+            };
 
-            // 3. Create User Profile (for login tracking)
+            // 3. Add CIPC data if verified
+            if (verificationData) {
+                vendorData.cipcVerified = true;
+                vendorData.cipcEnterpriseName = verificationData.enterpriseName;
+            }
+
+            // Add credential data if applicable
+            if (credentialMapping && formData.credentialNumber) {
+                vendorData[credentialMapping.field] = formData.credentialNumber;
+            }
+
+            // 3. Create Vendor Profile in Firestore
+            await setDoc(doc(db, "professionals", uid), vendorData);
+
+            // 4. Create User Profile (for login tracking)
             await setDoc(doc(db, "users", uid), {
                 email: formData.email,
                 role: 'vendor',
@@ -126,6 +219,24 @@ export default function VendorRegister() {
             Alert.alert("Registration Failed", error.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleCipcVerification = async () => {
+        if (!cipcRegNumber) {
+            Alert.alert("Input Error", "Please enter a CIPC registration number.");
+            return;
+        }
+        setCipcVerificationLoading(true);
+        setVerificationData(null); // Reset previous verification
+        try {
+            const result = await verifyCipcBusiness(cipcRegNumber);
+            setVerificationData(result);
+            Alert.alert("Verification Success", `Verified: ${result.enterpriseName}`);
+        } catch (error: any) {
+            Alert.alert("CIPC Verification Failed", error.message || "Could not verify business. Please check the registration number and try again.");
+        } finally {
+            setCipcVerificationLoading(false);
         }
     };
 
@@ -209,6 +320,7 @@ export default function VendorRegister() {
         }
     };
 
+
     return (
         <View style={styles.container}>
             <KeyboardAvoidingView
@@ -247,6 +359,7 @@ export default function VendorRegister() {
                             placeholder="e.g. Joe's Plumbing"
                             placeholderTextColor="#999"
                             value={formData.businessName}
+
                             onChangeText={(t) => setFormData({ ...formData, businessName: t })}
                         />
 
@@ -257,6 +370,28 @@ export default function VendorRegister() {
                             placeholderTextColor="#999"
                             value={formData.category}
                             onChangeText={(t) => setFormData({ ...formData, category: t })}
+                        />
+
+                        {credentialMapping && (
+                            <>
+                                <Text style={styles.label}>{credentialMapping.label}</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder={`Enter your ${credentialMapping.label}`}
+                                    value={formData.credentialNumber}
+                                    onChangeText={(t) => setFormData({ ...formData, credentialNumber: t })}
+                                />
+                            </>
+                        )}
+
+                        <Text style={styles.label}>Website</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="https://your-business.com"
+                            placeholderTextColor="#999"
+                            keyboardType="url"
+                            value={formData.website}
+                            onChangeText={(t) => setFormData({ ...formData, website: t })}
                         />
 
                         <Text style={styles.label}>About Your Services</Text>
@@ -270,6 +405,33 @@ export default function VendorRegister() {
                             onChangeText={(t) => setFormData({ ...formData, description: t })}
                         />
 
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>CIPC Registration Number</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <TextInput
+                                    style={[styles.input, { flex: 1, marginRight: 10 }]}
+                                    placeholder="Enter CIPC Registration Number"
+                                    placeholderTextColor="#999"
+                                    value={cipcRegNumber}
+                                    onChangeText={setCipcRegNumber}
+                                />
+                                <TouchableOpacity
+                                    style={[styles.editButton, { paddingVertical: 12, paddingHorizontal: 15 }]}
+                                    onPress={handleCipcVerification}
+                                    disabled={cipcVerificationLoading}
+                                >
+                                    {cipcVerificationLoading ? (
+                                        <ActivityIndicator color={THEME.navy} />
+                                    ) : (
+                                        <Text style={styles.editButtonText}>VERIFY NOW</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
+                        {verificationData?.enterpriseName && (
+                            <Text style={{ color: 'green', fontWeight: 'bold', marginTop: -10, marginBottom: 10 }}>✅ CIPC Verified: {verificationData.enterpriseName}</Text>
+                        )}
                         <Text style={styles.label}>Province</Text>
                         <TouchableOpacity style={styles.selector} onPress={() => openSelectionModal('province')}>
                             <Text style={[styles.selectorText, provinces.length === 0 && styles.placeholderText]}>
@@ -381,13 +543,22 @@ const styles = StyleSheet.create({
     title: { fontSize: 28, fontWeight: '900', color: THEME.white, marginBottom: 5 },
     subtitle: { fontSize: 14, color: THEME.gold, marginBottom: 30, fontWeight: 'bold' },
     form: { gap: 15 },
+
+    inputGroup: {
+        gap: 8,
+        marginBottom: 10
+    },
     label: { color: THEME.white, fontSize: 12, fontWeight: 'bold', marginLeft: 5, textTransform: 'uppercase' },
     input: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 15, color: THEME.white, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
     textArea: { height: 100, textAlignVertical: 'top' },
     selector: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+
     selectorText: { color: THEME.white, fontWeight: 'bold' },
     placeholderText: { color: '#999' },
     submitButton: { backgroundColor: THEME.gold, padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 20 },
+    editButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: THEME.gold, padding: 10, borderRadius: 8, alignSelf: 'flex-start', marginTop: -5 },
+    editButtonText: { color: THEME.navy, fontWeight: '900', fontSize: 10 },
+
     submitButtonText: { color: THEME.navy, fontWeight: '900', fontSize: 14, letterSpacing: 1 },
 
     // Modal Styles
@@ -397,8 +568,9 @@ const styles = StyleSheet.create({
     modalTitle: { fontSize: 18, fontWeight: '900', color: THEME.navy, textTransform: 'uppercase' },
     modalItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 5 },
     modalItemText: { fontSize: 16, color: THEME.navy, fontWeight: '600' },
+
     logoContainer: { width: 100, height: 100, borderRadius: 50, overflow: 'hidden', marginBottom: 10, borderWidth: 2, borderColor: THEME.gold, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
     logoImage: { width: '100%', height: '100%' },
-    logoPlaceholder: { alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' },
+    logoPlaceholder: { alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: THEME.white },
     logoText: { color: THEME.gold, fontSize: 10, fontWeight: 'bold', marginTop: 5 },
 });
