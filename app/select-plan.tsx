@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Crypto from 'expo-crypto';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -16,19 +15,17 @@ const THEME = {
 
 const PLANS = [
     { id: 'basic', name: "Basic", price: 0, frequency: "Free", features: ["Standard business listing", "Professional profile page", "Receive requests", "Appear in search", "3 specific regions"], trial: false },
-    { id: 'one_region', name: "One Region", price: 199, frequency: "Monthly", features: ["Be Seen First in your region", "Verified Pro Badge", "Appear in Top 8 local results", "Detailed Weekly Growth Reports"], trial: true, comingSoon: true },
-    { id: 'three_regions', name: "Three Regions", price: 299, frequency: "Monthly", features: ["Be Seen First in 3 regions", "Verified Pro Badge", "Appear in Top 8 local results", "Detailed Weekly Growth Reports"], trial: true, comingSoon: true },
-    { id: 'provincial', name: "Provincial", price: 599, frequency: "Monthly", features: ["Coverage for an entire province", "Everything in 'One Region'", "Featured on provincial home", "Priority support", "Advanced analytics"], trial: true, recommended: true, comingSoon: true },
-    { id: 'multi_province', name: "Multi-Province", price: 1499, frequency: "Monthly", features: ["Unlimited multi-province coverage", "Everything in 'Provincial'", "Verified National Partner", "Unlimited category listings"], trial: true, comingSoon: true }
+    { id: 'one_region', name: "One Region", price: 199, frequency: "Monthly", features: ["Priority listing in 1 region", "Verified Pro Badge", "Access to Performance Insights", "View & Reply to Customer Reviews", "Detailed Growth Reports"], trial: true },
+    { id: 'three_regions', name: "Three Regions", price: 299, frequency: "Monthly", features: ["Priority listing in 3 regions", "Verified Pro Badge", "Access to Performance Insights", "View & Reply to Customer Reviews", "Detailed Growth Reports"], trial: true },
+    { id: 'provincial', name: "Provincial", price: 599, frequency: "Monthly", features: ["Province-wide coverage", "Featured on provincial home", "Priority support", "Advanced Analytics & Insights", "Reputation Management Tools"], trial: true, recommended: true },
+    { id: 'multi_province', name: "Multi-Province", price: 1499, frequency: "Monthly", features: ["National multi-province coverage", "Verified National Partner", "Unlimited category listings", "Full Suite of Pro Tools"], trial: true }
 ];
 
 // Replace with your actual PayFast Merchant ID and Key
-const MERCHANT_ID = process.env.EXPO_PUBLIC_PAYFAST_MERCHANT_ID || "33365711";
-const MERCHANT_KEY = process.env.EXPO_PUBLIC_PAYFAST_MERCHANT_KEY || "ump8fde2nc8xm";
-const PASSPHRASE = process.env.EXPO_PUBLIC_PAYFAST_PASSPHRASE || "Motivation_1";
-const PAYFAST_URL = process.env.EXPO_PUBLIC_PAYFAST_URL || "https://www.payfast.co.za/eng/process";
-// IMPORTANT: This must point to your LIVE web backend to process the ITN
-const NOTIFY_URL = "https://slyzah.co.za/api/payfast/itn";
+// IMPORTANT: Your secret keys (MERCHANT_KEY, PASSPHRASE) should NOT be here.
+// They must be moved to a secure backend. This file will now call a secure API
+// endpoint to generate the payment link.
+const YOUR_BACKEND_URL = "https://slyzah.co.za"; // Replace with your actual backend URL
 
 const GROWTH_PLAN_TERMS = [
     "1. Subscription Activation: All paid tiers (One Region, Provincial, Multi-Province) are billed immediately upon registration. Service access is granted once the first payment is confirmed.",
@@ -222,25 +219,10 @@ export default function SelectPlan() {
             }
 
             // 3. Handle Paid Plan (PayFast Integration)
-            if (!MERCHANT_ID || !MERCHANT_KEY) {
-                Alert.alert("Configuration Error", "PayFast Merchant ID/Key not found.");
-                setLoading(false);
-                return;
-            }
-
             const { initialAmount, recurringAmount, billingDate } = calculateSubscription(plan.price, plan.trial);
 
-            // Construct PayFast URL
-            // PayFast requires valid HTTP/HTTPS URLs. Custom schemes trigger 400 Bad Request.
-            const returnUrl = `https://slyzah.co.za/payment-return?status=success`;
-            const cancelUrl = `https://slyzah.co.za/payment-cancel?status=cancel`;
-
-            const data: Record<string, string> = {
-                merchant_id: MERCHANT_ID,
-                merchant_key: MERCHANT_KEY,
-                return_url: returnUrl,
-                cancel_url: cancelUrl,
-                notify_url: NOTIFY_URL,
+            // Data to send to your backend API to generate a signed URL
+            const payload = {
                 email_address: user.email || "",
                 m_payment_id: `sub_${user.uid}_${Date.now()}`,
                 amount: initialAmount,
@@ -249,42 +231,31 @@ export default function SelectPlan() {
                 subscription_type: '1',
                 billing_date: billingDate,
                 recurring_amount: recurringAmount,
-                frequency: '3',
-                cycles: '0'
+                frequency: '3', // 3 = Monthly
+                cycles: '0' // 0 = Indefinite
             };
 
-            // Generate Signature
-            let pfOutput = "";
-            const requiredOrder = [
-                'merchant_id', 'merchant_key', 'return_url', 'cancel_url', 'notify_url',
-                'email_address', 'm_payment_id', 'amount', 'item_name', 'item_description',
-                'subscription_type', 'billing_date', 'recurring_amount', 'frequency', 'cycles'
-            ];
-
-            requiredOrder.forEach((key) => {
-                if (data[key]) {
-                    const value = String(data[key]).trim();
-                    // Align with Web: replace %20 with + and ensure uppercase hex for PayFast compatibility
-                    const encodedValue = encodeURIComponent(value)
-                        .replace(/%20/g, "+")
-                        .replace(/%[0-9a-fA-F]{2}/g, (match) => match.toUpperCase());
-                    pfOutput += `${key}=${encodedValue}&`;
-                }
+            // Call your secure backend endpoint to get the signed URL
+            const response = await fetch(`${YOUR_BACKEND_URL}/api/generate-payment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    // Secure your endpoint by verifying the user's identity
+                    'Authorization': `Bearer ${await user.getIdToken()}`
+                },
+                body: JSON.stringify(payload)
             });
 
-            let signatureString = pfOutput.slice(0, -1); // Remove trailing &
-            if (PASSPHRASE) {
-                signatureString += `&passphrase=${encodeURIComponent(PASSPHRASE.trim())
-                    .replace(/%20/g, "+")
-                    .replace(/%[0-9a-fA-F]{2}/g, (match) => match.toUpperCase())}`;
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Failed to generate payment link from server.");
             }
 
-            const signature = await Crypto.digestStringAsync(
-                Crypto.CryptoDigestAlgorithm.MD5,
-                signatureString
-            );
+            const { paymentUrl } = await response.json();
 
-            const paymentUrl = `${PAYFAST_URL}?${pfOutput}signature=${signature}`;
+            if (!paymentUrl) {
+                throw new Error("Payment URL was not returned from the server.");
+            }
 
             // Open Web Browser for Payment
             const result = await WebBrowser.openBrowserAsync(paymentUrl);
@@ -508,28 +479,45 @@ const styles = StyleSheet.create({
 
     featuresContainer: { gap: 8, marginBottom: 20 },
     featureRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    featureText: { color: '#ccc', fontSize: 12, fontWeight: 'bold' },
+    featureText: { color: THEME.navy, fontSize: 11, fontWeight: 'bold' },
 
     selectButton: {
-        backgroundColor: THEME.white,
         padding: 15,
         borderRadius: 12,
         alignItems: 'center',
     },
-    disabledButton: {
-        backgroundColor: '#444',
+    goldButton: {
+        backgroundColor: THEME.gold,
     },
-    selectButtonText: { color: THEME.navy, fontWeight: '900', fontSize: 12, letterSpacing: 1 },
+    navyButton: {
+        backgroundColor: THEME.navy,
+    },
+    disabledButton: {
+        backgroundColor: '#F3F4F6',
+    },
+    selectButtonText: { fontWeight: '900', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase' },
+
+    // Terms Box
+    termsBox: {
+        backgroundColor: '#F9FAFB',
+        borderRadius: 20,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        marginTop: 20,
+    },
+    termsHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+    termsTitle: { fontSize: 12, fontWeight: '900', color: THEME.navy, textTransform: 'uppercase', letterSpacing: 0.5 },
+    termsScroll: { maxHeight: 150, marginBottom: 15 },
+    termText: { fontSize: 10, color: '#6B7280', marginBottom: 8, lineHeight: 16 },
+    checkboxContainer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    checkboxText: { fontSize: 12, fontWeight: 'bold', color: THEME.navy, flex: 1 },
 
     // Modal Styles
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,31,63,0.95)', justifyContent: 'center', padding: 20 },
-    modalContent: { backgroundColor: THEME.navy, borderRadius: 20, padding: 20, maxHeight: '80%', borderWidth: 1, borderColor: THEME.gold },
-    modalTitle: { fontSize: 20, fontWeight: '900', color: THEME.white, marginBottom: 5, textTransform: 'uppercase' },
+    modalContent: { backgroundColor: THEME.white, borderRadius: 20, padding: 20, maxHeight: '80%' },
+    modalTitle: { fontSize: 20, fontWeight: '900', color: THEME.navy, textTransform: 'uppercase', marginBottom: 5 },
     modalSubtitle: { fontSize: 12, color: '#ccc', marginBottom: 15 },
-    termsScroll: { marginBottom: 20 },
-    termText: { color: '#e0e0e0', fontSize: 13, marginBottom: 12, lineHeight: 20 },
-    checkboxContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
-    checkboxText: { color: THEME.white, fontSize: 14, fontWeight: 'bold' },
     modalButtons: { flexDirection: 'row', gap: 10 },
     cancelButton: { flex: 1, padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#666', alignItems: 'center' },
     cancelButtonText: { color: '#ccc', fontWeight: 'bold' },

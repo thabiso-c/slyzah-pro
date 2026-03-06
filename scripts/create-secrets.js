@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Destructure all potential secrets from environment variables
-const { GOOGLE_SERVICES_JSON, GOOGLE_SERVICE_INFO_PLIST } = process.env;
+const { GOOGLE_SERVICES_JSON, GOOGLE_SERVICE_INFO_PLIST, FCM_KEY_JSON } = process.env;
 
 // --- Create google-services.json for Android ---
 if (GOOGLE_SERVICES_JSON) {
@@ -33,6 +33,18 @@ if (GOOGLE_SERVICE_INFO_PLIST) {
         console.log('✅ Created GoogleService-Info.plist');
     } catch (error) {
         console.error('❌ Error creating GoogleService-Info.plist:', error);
+        process.exit(1);
+    }
+}
+
+// --- Create fcm-key.json (if needed for build configuration) ---
+if (FCM_KEY_JSON) {
+    try {
+        const decoded = Buffer.from(FCM_KEY_JSON, 'base64').toString('utf8');
+        fs.writeFileSync(path.join(process.cwd(), 'fcm-key.json'), decoded);
+        console.log('✅ Created fcm-key.json');
+    } catch (error) {
+        console.error('❌ Error creating fcm-key.json:', error);
         process.exit(1);
     }
 }

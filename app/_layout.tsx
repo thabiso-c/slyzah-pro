@@ -346,6 +346,13 @@ export default function RootLayout() {
             headerShown: false,
           }}
         />
+        <Drawer.Screen
+          name="api_client"
+          options={{
+            drawerItemStyle: { display: 'none' },
+            headerShown: false,
+          }}
+        />
       </Drawer>
     </GestureHandlerRootView>
   );

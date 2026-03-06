@@ -54,6 +54,10 @@ export default function VendorDashboard() {
     const [activeTab, setActiveTab] = useState("dashboard");
     const leadsRef = useRef<any[]>([]);
     const [jobsFilter, setJobsFilter] = useState<'active' | 'completed'>('active');
+    const [reviews, setReviews] = useState<any[]>([]);
+    const [replyingTo, setReplyingTo] = useState<any | null>(null);
+    const [replyText, setReplyText] = useState('');
+    const [replySubmitting, setReplySubmitting] = useState(false);
 
     // Quote Modal State
     const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
@@ -214,6 +218,17 @@ export default function VendorDashboard() {
                         const unread = notifList.filter((n: any) => n.status === 'unread').length;
                         setUnreadNotifCount(unread);
                     });
+
+                    // 6. Listen for Reviews
+                    const reviewsQuery = query(
+                        collection(db, "reviews"),
+                        where("vendorId", "==", profileData.id),
+                        orderBy("createdAt", "desc")
+                    );
+                    onSnapshot(reviewsQuery, (snapshot) => {
+                        setReviews(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+                    });
+
                 } else {
                     Alert.alert("Error", "Vendor profile not found.");
                     setLoading(false);
@@ -365,6 +380,31 @@ export default function VendorDashboard() {
         }
     };
 
+    const handleSendReply = async () => {
+        if (!replyingTo || !replyText.trim()) {
+            Alert.alert("Input Error", "Please enter a reply message.");
+            return;
+        }
+        setReplySubmitting(true);
+        try {
+            const reviewRef = doc(db, "reviews", replyingTo.id);
+            await updateDoc(reviewRef, {
+                reply: {
+                    text: replyText,
+                    createdAt: serverTimestamp()
+                }
+            });
+            Alert.alert("Success", "Your reply has been posted.");
+            setReplyingTo(null);
+            setReplyText('');
+        } catch (error: any) {
+            Alert.alert("Error", "Failed to post reply.");
+            console.error("Reply error:", error);
+        } finally {
+            setReplySubmitting(false);
+        }
+    };
+
     const directRequests = useMemo(() => {
         return leads.filter(lead =>
             lead.status === 'open' &&
@@ -410,6 +450,27 @@ export default function VendorDashboard() {
     const isPaidTier = useMemo(() =>
         profile?.tier && profile.tier.toLowerCase() !== 'basic'
         , [profile]);
+
+    const averageRating = useMemo(() => {
+        if (reviews.length > 0) {
+            const total = reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0);
+            return (total / reviews.length).toFixed(1);
+        }
+        return profile?.rating ? Number(profile.rating).toFixed(1) : "5.0";
+    }, [reviews, profile]);
+
+    const ratingBreakdown = useMemo(() => {
+        const breakdown = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+        if (reviews.length > 0) {
+            for (const review of reviews) {
+                const rating = Math.round(Number(review.rating) || 0);
+                if (rating >= 1 && rating <= 5) {
+                    breakdown[rating as keyof typeof breakdown]++;
+                }
+            }
+        }
+        return breakdown;
+    }, [reviews]);
 
     if (loading) {
         return (
@@ -597,8 +658,8 @@ export default function VendorDashboard() {
                             </View>
                             <View style={styles.statCard}>
                                 <Ionicons name="star" size={24} color="#8B5CF6" />
-                                <Text style={styles.statValue}>{profile?.rating || "5.0"}</Text>
-                                <Text style={styles.statLabel}>Rating</Text>
+                                <Text style={styles.statValue}>{averageRating}</Text>
+                                <Text style={styles.statLabel}>Avg Rating</Text>
                             </View>
                         </View>
 
@@ -635,6 +696,55 @@ export default function VendorDashboard() {
                                         </Text>
                                     </View>
                                 ))}
+                            </View>
+                        )}
+
+                        {/* NEW REVIEWS SECTION */}
+                        {isPaidTier && (
+                            <View style={styles.section}>
+                                <Text style={styles.sectionTitle}>User Reviews</Text>
+                                {reviews.length > 0 ? (
+                                    reviews.map((review) => (
+                                        <View key={review.id} style={styles.reviewCard}>
+                                            <View style={styles.reviewHeader}>
+                                                <Text style={styles.reviewAuthor}>{review.customerName || 'Anonymous'}</Text>
+                                                <View style={styles.starRating}>
+                                                    {[...Array(5)].map((_, i) => (
+                                                        <Ionicons
+                                                            key={i}
+                                                            name={i < review.rating ? 'star' : 'star-outline'}
+                                                            size={16}
+                                                            color={THEME.gold}
+                                                        />
+                                                    ))}
+                                                </View>
+                                            </View>
+                                            <Text style={styles.reviewComment}>{review.comment}</Text>
+                                            <Text style={styles.reviewTime}>{timeAgo(review.createdAt)}</Text>
+
+                                            {review.reply ? (
+                                                <View style={styles.replyContainer}>
+                                                    <Text style={styles.replyHeader}>Your Reply:</Text>
+                                                    <Text style={styles.replyText}>{review.reply.text}</Text>
+                                                </View>
+                                            ) : (
+                                                review.rating < 3 && (
+                                                    <TouchableOpacity
+                                                        style={styles.replyButton}
+                                                        onPress={() => setReplyingTo(review)}
+                                                    >
+                                                        <Text style={styles.replyButtonText}>Reply to this review</Text>
+                                                    </TouchableOpacity>
+                                                )
+                                            )}
+                                        </View>
+                                    ))
+                                ) : (
+                                    <View style={styles.emptyState}>
+                                        <Ionicons name="chatbox-ellipses-outline" size={30} color="#ccc" />
+                                        <Text style={styles.emptyText}>No reviews yet.</Text>
+                                    </View>
+                                )}
                             </View>
                         )}
                     </View>
@@ -870,6 +980,42 @@ export default function VendorDashboard() {
                 </KeyboardAvoidingView>
             </Modal>
 
+            {/* REPLY MODAL */}
+            <Modal visible={!!replyingTo} animationType="slide" transparent>
+                <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Reply to Review</Text>
+                            <TouchableOpacity onPress={() => setReplyingTo(null)}>
+                                <Ionicons name="close" size={24} color={THEME.navy} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.reviewSnippet}>
+                            <Text style={styles.reviewSnippetText}>"{replyingTo?.comment}"</Text>
+                            <Text style={styles.reviewSnippetAuthor}>- {replyingTo?.customerName || 'Anonymous'}</Text>
+                        </View>
+
+                        <Text style={styles.inputLabel}>Your Reply</Text>
+                        <TextInput
+                            style={[styles.input, { height: 120, textAlignVertical: 'top' }]}
+                            placeholder="Address the customer's feedback..."
+                            multiline
+                            value={replyText}
+                            onChangeText={setReplyText}
+                        />
+
+                        <TouchableOpacity
+                            style={styles.submitButton}
+                            onPress={handleSendReply}
+                            disabled={replySubmitting}
+                        >
+                            {replySubmitting ? <ActivityIndicator color={THEME.navy} /> : <Text style={styles.submitButtonText}>SUBMIT REPLY</Text>}
+                        </TouchableOpacity>
+                    </View>
+                </KeyboardAvoidingView>
+            </Modal>
+
             {/* UPGRADE MODAL */}
             <Modal visible={upgradeModalVisible} animationType="fade" transparent>
                 <View style={styles.modalOverlay}>
@@ -1035,8 +1181,127 @@ const styles = StyleSheet.create({
     rejectionReason: { fontStyle: 'italic', color: '#7F1D1D', marginBottom: 5 },
     rejectionJob: { fontSize: 10, color: '#999', fontWeight: 'bold', textTransform: 'uppercase' },
 
+    // Rating Breakdown
+    breakdownContainer: {
+        backgroundColor: THEME.white,
+        padding: 20,
+        borderRadius: 20,
+    },
+    breakdownRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    breakdownLabel: {
+        width: 50,
+        fontSize: 12,
+        color: '#6B7280',
+        fontWeight: 'bold',
+    },
+    progressBarContainer: {
+        flex: 1,
+        height: 8,
+        backgroundColor: '#E5E7EB',
+        borderRadius: 4,
+        marginHorizontal: 10,
+    },
+    progressBar: {
+        height: '100%',
+        backgroundColor: THEME.gold,
+        borderRadius: 4,
+    },
+    breakdownCount: {
+        width: 30,
+        textAlign: 'right',
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: THEME.navy,
+    },
+
     // Support
     supportCard: { backgroundColor: THEME.white, padding: 20, borderRadius: 20 },
+    reviewCard: {
+        backgroundColor: THEME.white,
+        padding: 20,
+        borderRadius: 20,
+        marginBottom: 15,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+    },
+    reviewHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    reviewAuthor: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: THEME.navy,
+    },
+    starRating: {
+        flexDirection: 'row',
+    },
+    reviewComment: {
+        fontSize: 14,
+        color: '#6B7280',
+        lineHeight: 20,
+        marginBottom: 10,
+    },
+    reviewTime: {
+        fontSize: 10,
+        color: '#9CA3AF',
+        textAlign: 'right',
+    },
+    replyButton: {
+        marginTop: 15,
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        padding: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    replyButtonText: {
+        color: '#3B82F6',
+        fontWeight: 'bold',
+        fontSize: 12,
+    },
+    replyContainer: {
+        marginTop: 15,
+        padding: 15,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 10,
+        borderLeftWidth: 4,
+        borderLeftColor: THEME.green,
+    },
+    replyHeader: {
+        fontSize: 12,
+        fontWeight: '900',
+        color: THEME.navy,
+        marginBottom: 5,
+        textTransform: 'uppercase',
+    },
+    replyText: {
+        fontSize: 14,
+        color: '#374151',
+    },
+    reviewSnippet: {
+        padding: 15,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 10,
+        marginBottom: 20,
+    },
+    reviewSnippetText: {
+        fontStyle: 'italic',
+        color: '#6B7280',
+    },
+    reviewSnippetAuthor: {
+        textAlign: 'right',
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#9CA3AF',
+        marginTop: 5,
+    },
 
     // Modal
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,31,63,0.9)', justifyContent: 'center', padding: 20 },
