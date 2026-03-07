@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import Constants from 'expo-constants';
@@ -10,7 +11,6 @@ import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { auth, db } from '../lib/firebaseConfig';
@@ -85,7 +85,7 @@ function CustomDrawerContent(props: any) {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      router.replace('/login');
+      router.replace('/');
     } catch (error) {
       console.error('Error signing out: ', error);
     }
@@ -233,7 +233,7 @@ export default function RootLayout() {
     } else if (user) {
       if (!isTermsAccepted && !inTermsGroup && !inPaymentGroup) {
         router.replace('/terms');
-      } else if (isTermsAccepted && (pathname === '/' || pathname === '/login' || pathname === '/terms')) {
+      } else if (isTermsAccepted && (pathname === '/' || pathname === '/terms')) {
         router.replace('/dashboard');
       }
     }
