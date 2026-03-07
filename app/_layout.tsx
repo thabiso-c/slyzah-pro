@@ -98,7 +98,7 @@ function CustomDrawerContent(props: any) {
         <View style={styles.drawerHeader}>
           <View style={styles.logoContainer}>
             <Image
-              source={require('../assets/images/splash-icon.png')}
+              source={require('../assets/splash-icon.png')}
               style={styles.drawerLogo}
               resizeMode="contain"
             />
@@ -271,7 +271,7 @@ export default function RootLayout() {
           }}
         />
         <Drawer.Screen
-          name="dashboard/index"
+          name="dashboard"
           options={{
             drawerLabel: 'Dashboard',
             title: 'VENDOR DASHBOARD',
@@ -284,16 +284,6 @@ export default function RootLayout() {
             drawerLabel: 'Profile',
             title: 'PROFILE',
             drawerIcon: ({ color }) => <Ionicons name="person-outline" size={22} color={color} />
-          }}
-        />
-
-        {/* Hidden Login Route */}
-        <Drawer.Screen
-          name="login"
-          options={{
-            drawerItemStyle: { display: 'none' },
-            headerShown: false,
-            swipeEnabled: false,
           }}
         />
 
@@ -329,10 +319,6 @@ export default function RootLayout() {
           options={{ drawerItemStyle: { display: 'none' }, headerShown: false }}
         />
         <Drawer.Screen
-          name="chat/[id]"
-          options={{ drawerItemStyle: { display: 'none' }, headerShown: false }}
-        />
-        <Drawer.Screen
           name="terms"
           options={{
             drawerItemStyle: { display: 'none' },
@@ -341,13 +327,6 @@ export default function RootLayout() {
         />
         <Drawer.Screen
           name="forgot-password"
-          options={{
-            drawerItemStyle: { display: 'none' },
-            headerShown: false,
-          }}
-        />
-        <Drawer.Screen
-          name="api_client"
           options={{
             drawerItemStyle: { display: 'none' },
             headerShown: false,

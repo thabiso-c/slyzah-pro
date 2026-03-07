@@ -59,7 +59,7 @@ export default function TermsScreen() {
                 router.replace('/dashboard');
             } else {
                 Alert.alert("Session Error", "Please login again.");
-                router.replace('/login');
+                router.replace('/');
             }
         } catch (error) {
             console.error("Terms Acceptance Error:", error);

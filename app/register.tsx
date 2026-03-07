@@ -7,8 +7,8 @@ import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import RNPickerSelect from 'react-native-picker-select';
+import { verifyCipcBusiness } from '../lib/api_client';
 import { auth, db, storage } from '../lib/firebaseConfig';
-import { verifyCipcBusiness } from './api_client';
 
 const THEME = {
     navy: '#001f3f',

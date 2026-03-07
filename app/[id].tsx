@@ -56,7 +56,7 @@ export default function UnifiedChatPage() {
 
         const unsubAuth = auth.onAuthStateChanged(async (u: User | null) => {
             if (!u) {
-                router.replace("/login");
+                router.replace("/");
                 return;
             }
             setUser(u);

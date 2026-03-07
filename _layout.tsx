@@ -51,7 +51,7 @@ function CustomDrawerContent(props: any) {
     const handleLogout = async () => {
         try {
             await signOut(auth);
-            router.replace('/login');
+            router.replace('/');
         } catch (error) {
             console.error('Error signing out: ', error);
         }
@@ -64,7 +64,7 @@ function CustomDrawerContent(props: any) {
                 <View style={styles.drawerHeader}>
                     <View style={styles.logoContainer}>
                         <Image
-                            source={require('../assets/logo6.png')}
+                            source={require('../assets/splash-icon.png')}
                             style={styles.drawerLogo}
                             resizeMode="contain"
                         />
@@ -235,7 +235,7 @@ export default function RootLayout() {
         } else if (user) {
             if (!isTermsAccepted && !inTermsGroup && !inPaymentGroup) {
                 router.replace('/terms');
-            } else if (isTermsAccepted && (pathname === '/' || pathname === '/login')) {
+            } else if (isTermsAccepted && (pathname === '/' || pathname === '/terms')) {
                 router.replace('/dashboard');
             }
         }
@@ -289,16 +289,6 @@ export default function RootLayout() {
                     }}
                 />
 
-                {/* Hidden Login Route */}
-                <Drawer.Screen
-                    name="login"
-                    options={{
-                        drawerItemStyle: { display: 'none' },
-                        headerShown: false,
-                        swipeEnabled: false,
-                    }}
-                />
-
                 {/* Vendor Specific Hidden Routes */}
                 <Drawer.Screen
                     name="register"
@@ -328,10 +318,6 @@ export default function RootLayout() {
                 />
                 <Drawer.Screen
                     name="[id]"
-                    options={{ drawerItemStyle: { display: 'none' }, headerShown: false }}
-                />
-                <Drawer.Screen
-                    name="chat/[id]"
                     options={{ drawerItemStyle: { display: 'none' }, headerShown: false }}
                 />
                 <Drawer.Screen
