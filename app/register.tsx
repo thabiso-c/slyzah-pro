@@ -375,7 +375,7 @@ export default function VendorRegister() {
         try {
             const result = await verifyCredentialDocument(file, label);
             if (result.number) {
-                setFormData(prev => ({ ...prev, credentialNumber: result.number }));
+                setFormData(prev => ({ ...prev, credentialNumber: result.number || '' }));
                 setCredentialVerified(true);
                 setCredentialFile(file);
                 Alert.alert("Success", `Successfully scanned ${label}: ${result.number}`);

@@ -1,8 +1,15 @@
 import * as FileSystem from 'expo-file-system';
 
-// REPLACE THIS WITH YOUR ACTUAL GOOGLE CLOUD VISION API KEY
-const GOOGLE_CLOUD_VISION_API_KEY = "YOUR_GOOGLE_CLOUD_VISION_API_KEY";
-const GOOGLE_CLOUD_VISION_URL = `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_CLOUD_VISION_API_KEY}`;
+// --- OCR API Configurations ---
+
+// PRIMARY: OCR.space API (Free alternative)
+// Get a free key at https://ocr.space/ocrapi/freekey to avoid 'helloworld' rate limits.
+const OCR_SPACE_API_KEY = process.env.EXPO_PUBLIC_OCR_SPACE_API_KEY || "helloworld";
+const OCR_SPACE_API_URL = "https://api.ocr.space/parse/image";
+
+// FALLBACK: API Ninjas - Get your free key from https://api-ninjas.com/
+const API_NINJAS_API_KEY = process.env.EXPO_PUBLIC_API_NINJAS_API_KEY;
+const API_NINJAS_API_URL = "https://api.api-ninjas.com/v1/imagetotext";
 
 // Patterns for different credential types
 const CREDENTIAL_PATTERNS: Record<string, RegExp> = {
@@ -17,8 +24,7 @@ const CREDENTIAL_PATTERNS: Record<string, RegExp> = {
     "default": /\b([A-Z0-9-]{4,15})\b/i
 };
 
-// Helper to extract text from file (PDF or Image)
-const extractTextFromDocument = async (file: any, stopRegex?: RegExp): Promise<string> => {
+const extractTextWithOcrSpace = async (file: any): Promise<string> => {
     try {
         if (!file || !file.uri) throw new Error("Invalid file");
 
@@ -27,20 +33,92 @@ const extractTextFromDocument = async (file: any, stopRegex?: RegExp): Promise<s
             encoding: FileSystem.EncodingType.Base64,
         });
 
-        // Construct the request body for Google Cloud Vision
-        const body = {
-            requests: [
-                {
-                    image: { content: base64 },
-                    features: [{ type: "DOCUMENT_TEXT_DETECTION" }]
-                }
-            ]
-        };
+        // Detect mime type or default to jpeg (OCR.space supports PDF/Image via base64)
+        const mimeType = file.mimeType || (file.uri.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+        const dataUri = `data:${mimeType};base64,${base64}`;
 
-    } catch (error) {
-        console.error("OCR Extraction Error:", error);
+        const formData = new FormData();
+        formData.append("base64Image", dataUri);
+        formData.append("apikey", OCR_SPACE_API_KEY);
+        formData.append("language", "eng");
+        formData.append("isOverlayRequired", "false");
+        formData.append("OCREngine", "2"); // Engine 2 is often better for text documents
+
+        const response = await fetch(OCR_SPACE_API_URL, {
+            method: "POST",
+            body: formData
+        });
+
+        const json = await response.json();
+
+        if (json.IsErroredOnProcessing) {
+            console.warn("OCR Space Error:", json.ErrorMessage);
+            return "";
+        }
+
+        if (json.ParsedResults && Array.isArray(json.ParsedResults)) {
+            return json.ParsedResults.map((r: any) => r.ParsedText).join('\n');
+        }
+
+        return "";
+    } catch (error: any) {
+        console.error("OCR.space Extraction Error:", error);
         return "";
     }
+};
+
+const extractTextWithApiNinjas = async (file: any): Promise<string> => {
+    if (!API_NINJAS_API_KEY) {
+        console.warn("API Ninjas OCR is not configured. Skipping fallback.");
+        return "";
+    }
+
+    try {
+        const formData = new FormData();
+        // The type assertion is needed because React Native's FormData typing for fetch is slightly different
+        formData.append('image', {
+            uri: file.uri,
+            name: file.name,
+            type: file.mimeType || 'image/jpeg',
+        } as any);
+
+        const response = await fetch(API_NINJAS_API_URL, {
+            method: 'POST',
+            headers: {
+                'X-Api-Key': API_NINJAS_API_KEY,
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API Ninjas OCR failed with status ${response.status}: ${errorText}`);
+        }
+
+        const json = await response.json();
+        if (Array.isArray(json)) {
+            return json.map((item: any) => item.text).join('\n');
+        }
+        return "";
+
+    } catch (error) {
+        console.error("API Ninjas OCR Extraction Error:", error);
+        return "";
+    }
+};
+
+// Helper to extract text from file (PDF or Image) with fallback
+const extractTextFromDocument = async (file: any, stopRegex?: RegExp): Promise<string> => {
+    // Primary: OCR.space
+    let text = await extractTextWithOcrSpace(file);
+
+    // Fallback: API-Ninjas if primary fails or returns no text
+    if (!text) {
+        console.log("OCR.space failed or returned empty, falling back to API Ninjas OCR...");
+        text = await extractTextWithApiNinjas(file);
+    }
+
+    return text;
 };
 
 export const verifyCIPCDocument = async (file: any) => {
