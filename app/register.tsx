@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
@@ -7,8 +8,8 @@ import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import RNPickerSelect from 'react-native-picker-select';
-import { verifyCipcBusiness } from '../lib/api_client';
 import { auth, db, storage } from '../lib/firebaseConfig';
+import { identifyAdditionalCert, verifyCIPCDocument, verifyCredentialDocument } from '../lib/ocr';
 
 const THEME = {
     navy: '#001f3f',
@@ -17,8 +18,8 @@ const THEME = {
     gray: '#F3F4F6',
 };
 
-const CREDENTIAL_MAPPING: Record<string, { label: string; field: string; docField: string; }> = {
-    "Plumber": { label: "PIRB Licensed", field: "pirbNumber", docField: "pirbDocumentUrl" },
+const CREDENTIAL_MAPPING: Record<string, { label: string; field: string; docField: string }> = {
+    "Plumber": { label: "PIRB / CoCT Reg", field: "pirbNumber", docField: "pirbDocumentUrl" },
     "Electrician": { label: "Wireman's License", field: "wiremanNumber", docField: "wiremanDocumentUrl" },
     "Panel Beater": { label: "RMI Member", field: "rmiNumber", docField: "rmiDocumentUrl" },
     "Builder": { label: "NHBRC Reg", field: "nhbrcNumber", docField: "nhbrcDocumentUrl" },
@@ -99,6 +100,24 @@ const resolveCredentialMapping = (categoryInput: string) => {
     return null;
 };
 
+const SUGGESTED_CREDENTIALS = [
+    "IOPSA Membership",
+    "BEE Level 2 Certificate",
+    "Tax Clearance Certificate",
+    "Liability Insurance",
+    "OHS Act Compliance",
+    "Workman’s Compensation (COIDA)",
+    "BIBC Registration",
+    "World Plumbing Council Affiliation",
+    "First Aid Level 1 Certificate",
+    "N.S.R.I Member",
+    "SEESA & NEASA Registered",
+    "Institute of Plumbing Member",
+    "NuFlow Potable License",
+    "Solar Water Heating Installation",
+    "Heat Pump Installer"
+];
+
 const LOCATION_MAPPING: Record<string, string[]> = {
     "Western Cape": ["Cape Town CBD", "Northern Suburbs", "Southern Suburbs", "Atlantic Seaboard", "Western Seaboard", "South Peninsula", "Cape Helderberg", "Cape Winelands", "Paarl/Wellington", "Stellenbosch", "Garden Route", "George/Knysna", "West Coast", "Overberg", "Central Karoo"],
     "Gauteng": ["Johannesburg CBD", "Sandton/Rivonia", "Randburg", "Roodepoort", "Soweto", "Midrand", "Pretoria/Tshwane CBD", "Centurion", "Pretoria East", "Pretoria North", "Ekurhuleni (East Rand)", "Kempton Park", "Brakpan/Benoni", "Sedibeng", "West Rand"],
@@ -151,11 +170,17 @@ export default function VendorRegister() {
     const [provinces, setProvinces] = useState<string[]>([]);
     const [regions, setRegions] = useState<string[]>([]);
     const [logoUri, setLogoUri] = useState<string | null>(null);
-    const [cipcRegNumber, setCipcRegNumber] = useState('');
-    const [cipcVerificationLoading, setCipcVerificationLoading] = useState(false);
-    const [verificationData, setVerificationData] = useState<any>(null);
-    const [credentialFile, setCredentialFile] = useState<ImagePicker.ImagePickerAsset | null>(null);
+    const [regNumber, setRegNumber] = useState('');
+    const [isVerifyingCIPC, setIsVerifyingCIPC] = useState(false);
+    const [cipcVerified, setCipcVerified] = useState(false);
+    const [cipcFile, setCipcFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+    const [credentialFile, setCredentialFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+    const [credentialVerified, setCredentialVerified] = useState(false);
+    const [isVerifyingCredential, setIsVerifyingCredential] = useState(false);
     const [showCustomCategory, setShowCustomCategory] = useState(false);
+    const [additionalCerts, setAdditionalCerts] = useState<{ id: string; name: string; file: DocumentPicker.DocumentPickerAsset | null; url: string | null; isCustom: boolean }[]>([]);
+    const [verifyingCertId, setVerifyingCertId] = useState<string | null>(null);
+
 
     const [formData, setFormData] = useState({
         businessName: '',
@@ -178,8 +203,8 @@ export default function VendorRegister() {
     }, [formData.category, formData.customCategory]);
 
     const handleRegister = async () => {
-        if (!verificationData) {
-            Alert.alert("Verification Required", "Please verify your CIPC Registration Number before proceeding.");
+        if (!cipcVerified || !regNumber) {
+            Alert.alert("Verification Required", "Please upload and verify your CIPC document before proceeding.");
             return;
         }
 
@@ -223,6 +248,28 @@ export default function VendorRegister() {
                 logoUrl = await getDownloadURL(snapshot.ref);
             }
 
+            // Upload CIPC doc
+            let cipcDocumentUrl = null;
+            if (cipcFile) {
+                const response = await fetch(cipcFile.uri);
+                const blob = await response.blob();
+                const storageRef = ref(storage, `cipc_docs/${uid}_${cipcFile.name}`);
+                const snapshot = await uploadBytes(storageRef, blob);
+                cipcDocumentUrl = await getDownloadURL(snapshot.ref);
+            }
+
+            // Upload Additional Certs
+            const finalAdditionalCerts = [];
+            for (const cert of additionalCerts) {
+                if (!cert.name.trim() || !cert.file) continue;
+                const response = await fetch(cert.file.uri);
+                const blob = await response.blob();
+                const storageRef = ref(storage, `additional_certs/${uid}/${Date.now()}_${cert.file.name}`);
+                const snapshot = await uploadBytes(storageRef, blob);
+                const certUrl = await getDownloadURL(snapshot.ref);
+                finalAdditionalCerts.push({ name: cert.name, url: certUrl });
+            }
+
             let credentialDocUrl = null;
             if (credentialFile && mapping) {
                 const response = await fetch(credentialFile.uri);
@@ -254,11 +301,11 @@ export default function VendorRegister() {
                 reviews: 0
             };
 
-            // 3. Add CIPC data if verified
-            if (verificationData) {
-                vendorData.cipcVerified = true;
-                vendorData.cipcEnterpriseName = verificationData.enterpriseName;
-            }
+            // Add CIPC data
+            vendorData.cipcRegistrationNumber = regNumber;
+            vendorData.cipcVerified = cipcVerified;
+            vendorData.cipcDocumentUrl = cipcDocumentUrl;
+            vendorData.additionalCertifications = finalAdditionalCerts;
 
             // Add credential data if applicable
             if (credentialMapping && formData.credentialNumber) {
@@ -266,6 +313,7 @@ export default function VendorRegister() {
                 if (credentialDocUrl) {
                     vendorData[credentialMapping.docField] = credentialDocUrl;
                 }
+                vendorData.credentialVerified = credentialVerified;
             }
 
             // 3. Create Vendor Profile in Firestore
@@ -296,21 +344,50 @@ export default function VendorRegister() {
         }
     };
 
-    const handleCipcVerification = async () => {
-        if (!cipcRegNumber) {
-            Alert.alert("Input Error", "Please enter a CIPC registration number.");
-            return;
-        }
-        setCipcVerificationLoading(true);
-        setVerificationData(null); // Reset previous verification
+    const processCIPCFile = async (file: DocumentPicker.DocumentPickerAsset) => {
+        setIsVerifyingCIPC(true);
         try {
-            const result = await verifyCipcBusiness(cipcRegNumber);
-            setVerificationData(result);
-            Alert.alert("Verification Success", `Verified: ${result.enterpriseName}`);
+            // NOTE: The OCR function needs a native implementation. This is a placeholder call.
+            const result = await verifyCIPCDocument(file);
+
+            if (result.registrationNumber) {
+                setRegNumber(result.registrationNumber);
+                if (result.vendorName) {
+                    setFormData(prev => ({ ...prev, businessName: result.vendorName as string }));
+                }
+                setCipcVerified(true);
+                setCipcFile(file);
+                Alert.alert("Success", `Successfully scanned: ${result.registrationNumber}`);
+            } else {
+                throw new Error(result.error || "Could not find a valid Registration Number.");
+            }
         } catch (error: any) {
-            Alert.alert("CIPC Verification Failed", error.message || "Could not verify business. Please check the registration number and try again.");
+            Alert.alert("Verification Failed", error.message || "Scan failed. Please upload a clear CIPC document.");
+            setCipcVerified(false);
+            setCipcFile(null);
         } finally {
-            setCipcVerificationLoading(false);
+            setIsVerifyingCIPC(false);
+        }
+    };
+
+    const processCredentialFile = async (file: DocumentPicker.DocumentPickerAsset, label: string) => {
+        setIsVerifyingCredential(true);
+        try {
+            const result = await verifyCredentialDocument(file, label);
+            if (result.number) {
+                setFormData(prev => ({ ...prev, credentialNumber: result.number }));
+                setCredentialVerified(true);
+                setCredentialFile(file);
+                Alert.alert("Success", `Successfully scanned ${label}: ${result.number}`);
+            } else {
+                throw new Error(result.error || `Could not find a valid ${label} Number.`);
+            }
+        } catch (error: any) {
+            Alert.alert("Verification Failed", error.message || "Scan failed. Please upload a clear document.");
+            setCredentialVerified(false);
+            setCredentialFile(null);
+        } finally {
+            setIsVerifyingCredential(false);
         }
     };
 
@@ -377,6 +454,52 @@ export default function VendorRegister() {
                 return;
             }
             setRegions(combined);
+        }
+    };
+
+    const addCertRow = () => {
+        setAdditionalCerts([...additionalCerts, { id: `new_${Date.now()}_${Math.random()}`, name: "", file: null, url: null, isCustom: false }]);
+    };
+
+    const removeCertRow = (id: string) => {
+        setAdditionalCerts(additionalCerts.filter(c => c.id !== id));
+    };
+
+    const handleCertTypeChange = (id: string, value: string) => {
+        setAdditionalCerts(prev => prev.map(c => {
+            if (c.id === id) {
+                if (value === "Other") {
+                    return { ...c, isCustom: true, name: "" };
+                } else {
+                    return { ...c, isCustom: false, name: value };
+                }
+            }
+            return c;
+        }));
+    };
+
+    const handleCertNameChange = (id: string, name: string) => {
+        setAdditionalCerts(additionalCerts.map(c => c.id === id ? { ...c, name } : c));
+    };
+
+    const handleCertFileChange = async (id: string, file: DocumentPicker.DocumentPickerAsset) => {
+        setAdditionalCerts(prev => prev.map(c => c.id === id ? { ...c, file } : c));
+
+        setVerifyingCertId(id);
+        try {
+            const result = await identifyAdditionalCert(file);
+            if (result.type) {
+                const certName = result.number ? `${result.type} - ${result.number}` : result.type;
+                setAdditionalCerts(prev => prev.map(c => {
+                    if (c.id === id && !c.name) { // Only auto-fill if user hasn't typed a name
+                        return { ...c, name: certName, isCustom: !SUGGESTED_CREDENTIALS.includes(result.type!) };
+                    }
+                    return c;
+                }));
+                Alert.alert("Document Identified", `Scanned: ${certName}`);
+            }
+        } finally {
+            setVerifyingCertId(null);
         }
     };
 
@@ -463,29 +586,34 @@ export default function VendorRegister() {
                     </Section>
 
                     <Section number={3} title="Service Capabilities">
-                        <View style={styles.cipcCard}>
-                            <Text style={styles.label}>CIPC Registration Number (Required)</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <View style={styles.verificationCard}>
+                            <Text style={styles.label}>CIPC Registration (Required)</Text>
+                            <Text style={styles.helperText}>Upload your CIPC/BizProfile document. We'll scan it for you.</Text>
+                            <View style={{ gap: 10, marginTop: 10 }}>
                                 <TextInput
-                                    style={[styles.input, { flex: 1 }]}
-                                    placeholder="e.g. 2024/123456/07"
-                                    placeholderTextColor="#999"
-                                    value={cipcRegNumber}
-                                    onChangeText={setCipcRegNumber}
+                                    style={[styles.input, styles.disabledInput]}
+                                    placeholder="Registration Number (from scan)"
+                                    value={regNumber}
+                                    editable={false}
                                 />
-                                <TouchableOpacity style={styles.verifyButton} onPress={handleCipcVerification} disabled={cipcVerificationLoading || !cipcRegNumber}>
-                                    {cipcVerificationLoading ? <ActivityIndicator color={THEME.navy} /> : <Text style={styles.verifyButtonText}>VERIFY</Text>}
+                                <TouchableOpacity style={[styles.fileButton, cipcVerified && styles.verifiedFileButton]} onPress={async () => {
+                                    const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
+                                    if (result.canceled === false) processCIPCFile(result.assets[0]);
+                                }} disabled={isVerifyingCIPC}>
+                                    {isVerifyingCIPC
+                                        ? <ActivityIndicator color={THEME.navy} />
+                                        : <Text style={[styles.fileButtonText, cipcVerified && { color: '#15803d' }]}>{cipcVerified ? `✓ Verified: ${cipcFile?.name}` : "Upload CIPC Document"}</Text>
+                                    }
                                 </TouchableOpacity>
                             </View>
-                            {verificationData && <Text style={styles.verifiedText}>✓ Verified Company: {formData.businessName}</Text>}
                         </View>
 
                         <Text style={styles.label}>Trading Name</Text>
                         <TextInput
-                            style={[styles.input, verificationData && styles.disabledInput]}
+                            style={[styles.input, cipcVerified && styles.disabledInput]}
                             placeholder="Your Business Name"
                             value={formData.businessName}
-                            editable={!verificationData}
+                            editable={!cipcVerified}
                             onChangeText={(t) => setFormData({ ...formData, businessName: t })}
                         />
 
@@ -522,14 +650,71 @@ export default function VendorRegister() {
                                 <Text style={styles.label}>{credentialMapping.label} Number</Text>
                                 <TextInput style={styles.input} placeholder="Registration Number" value={formData.credentialNumber} onChangeText={(t) => setFormData({ ...formData, credentialNumber: t })} />
                                 <Text style={styles.label}>Proof of Registration (Optional)</Text>
-                                <TouchableOpacity style={styles.fileButton} onPress={async () => {
-                                    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All });
-                                    if (!result.canceled) setCredentialFile(result.assets[0]);
-                                }}>
-                                    <Text style={styles.fileButtonText}>{credentialFile ? `Selected: ${credentialFile.fileName}` : "Upload Document"}</Text>
+                                <TouchableOpacity style={[styles.fileButton, credentialFile && styles.verifiedFileButton]} onPress={async () => {
+                                    const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
+                                    if (!result.canceled) processCredentialFile(result.assets[0], credentialMapping.label);
+                                }} disabled={isVerifyingCredential}>
+                                    {isVerifyingCredential
+                                        ? <ActivityIndicator color={THEME.navy} />
+                                        : <Text style={[styles.fileButtonText, credentialFile && { color: '#15803d' }]}>{credentialFile ? `✓ Verified: ${credentialFile.name}` : "Upload Document"}</Text>
+                                    }
                                 </TouchableOpacity>
                             </View>
                         )}
+
+                        <View style={{ marginTop: 20 }}>
+                            <View style={[styles.sectionHeaderContainer, { borderBottomColor: 'rgba(255,255,255,0.2)' }]}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text style={styles.sectionHeader}>Additional Certifications</Text>
+                                    <TouchableOpacity onPress={addCertRow} style={styles.addButton}>
+                                        <Text style={styles.addButtonText}>+ ADD</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                            {additionalCerts.length === 0 ? (
+                                <Text style={styles.helperText}>No additional certifications added.</Text>
+                            ) : (
+                                <View style={{ gap: 15 }}>
+                                    {additionalCerts.map((cert) => (
+                                        <View key={cert.id} style={styles.certRow}>
+                                            <View style={{ flex: 1, gap: 10 }}>
+                                                <RNPickerSelect
+                                                    onValueChange={(value) => handleCertTypeChange(cert.id, value)}
+                                                    items={[...SUGGESTED_CREDENTIALS.map(s => ({ label: s, value: s })), { label: "Other (Type Manually)", value: "Other" }]}
+                                                    style={pickerSelectStyles}
+                                                    value={cert.isCustom ? "Other" : cert.name}
+                                                    placeholder={{ label: "Select Certificate Type...", value: null }}
+                                                    useNativeAndroidPickerStyle={false}
+                                                    Icon={() => <Ionicons name="chevron-down" size={20} color="gray" />}
+                                                />
+                                                {cert.isCustom && (
+                                                    <TextInput
+                                                        style={styles.input}
+                                                        placeholder="Enter Certificate Name"
+                                                        value={cert.name}
+                                                        onChangeText={(name) => handleCertNameChange(cert.id, name)}
+                                                    />
+                                                )}
+                                                <TouchableOpacity style={[styles.fileButton, cert.file && styles.verifiedFileButton]} onPress={async () => {
+                                                    const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
+                                                    if (!result.canceled) handleCertFileChange(cert.id, result.assets[0]);
+                                                }} disabled={verifyingCertId === cert.id}>
+                                                    {verifyingCertId === cert.id
+                                                        ? <ActivityIndicator color={THEME.navy} />
+                                                        : <Text style={[styles.fileButtonText, cert.file && { color: '#15803d' }]}>{cert.file ? `✓ ${cert.file.name}` : "Upload Proof"}</Text>
+                                                    }
+                                                </TouchableOpacity>
+                                            </View>
+                                            <TouchableOpacity onPress={() => removeCertRow(cert.id)} style={{ padding: 5, marginLeft: 10 }}>
+                                                <Ionicons name="trash-outline" size={20} color="#f87171" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+
+
 
                         <Text style={styles.label}>Website URL (Optional)</Text>
                         <TextInput style={styles.input} placeholder="https://yourbusiness.co.za" keyboardType="url" value={formData.website} onChangeText={(t) => setFormData({ ...formData, website: t })} />
@@ -592,16 +777,14 @@ const styles = StyleSheet.create({
     subtitle: { fontSize: 12, color: THEME.gold, marginBottom: 30, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 2 },
     section: { marginBottom: 40 },
     sectionHeaderContainer: { borderBottomWidth: 4, borderBottomColor: THEME.navy, paddingBottom: 8, marginBottom: 20 },
-    sectionHeader: { fontSize: 18, fontWeight: '900', color: THEME.white, textTransform: 'uppercase', letterSpacing: 1 },
+    sectionHeader: { fontSize: 16, fontWeight: '900', color: THEME.white, textTransform: 'uppercase', letterSpacing: 1 },
     sectionContent: { gap: 15 },
     label: { color: THEME.white, fontSize: 10, fontWeight: '900', marginLeft: 5, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 },
     input: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 15, padding: 16, color: THEME.white, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', fontWeight: '600' },
     disabledInput: { backgroundColor: 'rgba(0,0,0,0.2)', color: '#999' },
     textArea: { height: 100, textAlignVertical: 'top' },
-    cipcCard: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 15, padding: 15, gap: 10 },
-    verifyButton: { backgroundColor: THEME.gold, paddingHorizontal: 20, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    verifyButtonText: { color: THEME.navy, fontWeight: '900', fontSize: 12 },
-    verifiedText: { color: '#22c55e', fontWeight: 'bold', fontSize: 12, marginTop: 5 },
+    verificationCard: { backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: 15, padding: 15, gap: 5, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.3)' },
+    helperText: { color: '#9ca3af', fontSize: 11, marginLeft: 5 },
     credentialCard: { backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: 15, padding: 15, gap: 10, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.3)' },
     credentialTitle: { color: THEME.white, fontWeight: '900', textTransform: 'uppercase' },
     fileButton: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 15, alignItems: 'center' },
@@ -625,6 +808,16 @@ const styles = StyleSheet.create({
     logoImage: { width: '100%', height: '100%' },
     logoPlaceholder: { alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: THEME.white },
     logoText: { color: THEME.gold, fontSize: 10, fontWeight: 'bold', marginTop: 5 },
+    verifiedFileButton: { backgroundColor: '#dcfce7' },
+    addButton: { backgroundColor: THEME.gold, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+    addButtonText: { color: THEME.navy, fontWeight: '900', fontSize: 10 },
+    certRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        padding: 15,
+        borderRadius: 15,
+    },
 });
 
 const pickerSelectStyles = StyleSheet.create({

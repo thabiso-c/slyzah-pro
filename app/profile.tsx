@@ -117,6 +117,7 @@ export default function ProfileScreen() {
         email: '',
         fullCategoryDescription: '',
         website: '',
+        additionalCerts: [] as string[],
     });
 
     // Location Modal State
@@ -124,6 +125,7 @@ export default function ProfileScreen() {
     const [modalType, setModalType] = useState<'province' | 'region'>('province');
     const [tempProvinces, setTempProvinces] = useState<string[]>([]);
     const [tempRegions, setTempRegions] = useState<string[]>([]);
+    const [newCertInput, setNewCertInput] = useState('');
     const [logoUri, setLogoUri] = useState<string | null>(null);
     const [cipcVerificationLoading, setCipcVerificationLoading] = useState(false);
     const [cipcRegNumber, setCipcRegNumber] = useState('');
@@ -156,6 +158,7 @@ export default function ProfileScreen() {
                         email: data.email || '',
                         fullCategoryDescription: data.fullCategoryDescription || data.description || '',
                         website: data.website || '',
+                        additionalCerts: data.additionalCerts || [],
                     });
                     setLogoUri(data.logo || null);
                 }
@@ -194,6 +197,7 @@ export default function ProfileScreen() {
                 email: formData.email,
                 fullCategoryDescription: formData.fullCategoryDescription,
                 website: formData.website,
+                additionalCerts: formData.additionalCerts,
                 logo: logoUrl,
             });
             Alert.alert("Success", "Profile updated successfully!");
@@ -203,6 +207,23 @@ export default function ProfileScreen() {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleAddCert = () => {
+        if (newCertInput.trim()) {
+            setFormData(prev => ({
+                ...prev,
+                additionalCerts: [...prev.additionalCerts, newCertInput.trim()]
+            }));
+            setNewCertInput('');
+        }
+    };
+
+    const handleRemoveCert = (indexToRemove: number) => {
+        setFormData(prev => ({
+            ...prev,
+            additionalCerts: prev.additionalCerts.filter((_, index) => index !== indexToRemove)
+        }));
     };
 
     const openLocationModal = (type: 'province' | 'region') => {
@@ -414,6 +435,35 @@ export default function ProfileScreen() {
                             />
                         </View>
 
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Additional Certifications</Text>
+                            <Text style={styles.helperText}>Showcase other qualifications to stand out.</Text>
+
+                            {formData.additionalCerts.map((cert, index) => (
+                                <View key={index} style={styles.certItem}>
+                                    <Text style={styles.certText}>{cert}</Text>
+                                    <TouchableOpacity onPress={() => handleRemoveCert(index)}>
+                                        <Ionicons name="close-circle" size={20} color="#EF4444" />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
+                                <TextInput
+                                    style={[styles.input, { flex: 1, marginRight: 10 }]}
+                                    placeholder="e.g. Certified Welder"
+                                    value={newCertInput}
+                                    onChangeText={setNewCertInput}
+                                />
+                                <TouchableOpacity
+                                    style={[styles.editButton, { paddingVertical: 12, paddingHorizontal: 15 }]}
+                                    onPress={handleAddCert}
+                                >
+                                    <Text style={styles.editButtonText}>ADD</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+
                         <View style={styles.readOnlyGroup}>
                             <Text style={styles.label}>Category</Text>
                             <View style={styles.readOnlyInput}>
@@ -568,6 +618,19 @@ const styles = StyleSheet.create({
     editButtonText: { color: THEME.navy, fontWeight: '900', fontSize: 10 },
     saveButton: { backgroundColor: THEME.gold, padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10 },
     saveButtonText: { color: THEME.navy, fontWeight: '900', fontSize: 14, letterSpacing: 1 },
+    certItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 8,
+    },
+    certText: {
+        color: THEME.white,
+        fontSize: 14,
+    },
 
     // Modal Styles
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,31,63,0.9)', justifyContent: 'center', padding: 20 },
