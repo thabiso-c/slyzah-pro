@@ -43,6 +43,9 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
+          "sounds": [
+            "./assets/slyzah_alert.mp3"
+          ],
           "color": "#FFFFFF"
         }
       ],

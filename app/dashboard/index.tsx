@@ -124,7 +124,9 @@ export default function VendorDashboard() {
                                             title: 'New Lead Available! ⚡',
                                             body: `${data.issueDescription} in ${data.town || data.region}`,
                                             data: { leadId: change.doc.id },
-                                            sound: 'default',
+                                            sound: 'slyzah_alert.mp3',
+                                            // @ts-ignore: channelId is supported on Android
+                                            channelId: 'slyzah_alert',
                                         },
                                         trigger: null,
                                     });
@@ -141,7 +143,9 @@ export default function VendorDashboard() {
                                                 title: 'Job Won! 🏆',
                                                 body: `You have been selected for: ${data.issueDescription}`,
                                                 data: { leadId: change.doc.id },
-                                                sound: 'default',
+                                                sound: 'slyzah_alert.mp3',
+                                                // @ts-ignore: channelId is supported on Android
+                                                channelId: 'slyzah_alert',
                                             },
                                             trigger: null,
                                         });
@@ -170,7 +174,9 @@ export default function VendorDashboard() {
                                             title: `New Message from ${data.customerName || 'Customer'}`,
                                             body: data.lastMessage,
                                             data: { chatId: data.id },
-                                            sound: 'default',
+                                            sound: 'slyzah_alert.mp3',
+                                            // @ts-ignore: channelId is supported on Android
+                                            channelId: 'slyzah_alert',
                                         },
                                         trigger: null,
                                     });
@@ -206,7 +212,9 @@ export default function VendorDashboard() {
                                             title: 'New Activity 🔔',
                                             body: typeof data.notificationMessage === 'string' ? data.notificationMessage : 'You have a new notification',
                                             data: { leadId: data.leadId, chatId: data.chatId },
-                                            sound: 'default',
+                                            sound: 'slyzah_alert.mp3',
+                                            // @ts-ignore: channelId is supported on Android
+                                            channelId: 'slyzah_alert',
                                         },
                                         trigger: null,
                                     });
@@ -345,11 +353,11 @@ export default function VendorDashboard() {
                                 },
                                 body: JSON.stringify({
                                     to: customerData.expoPushToken,
-                                    sound: 'default',
+                                    sound: 'slyzah_alert.mp3',
                                     title: 'New Quote Received! 💰',
                                     body: `${vendorName} sent you a quote for R${quotePrice}`,
                                     data: { leadId: selectedLead.id },
-                                    channelId: 'default',
+                                    channelId: 'slyzah_alert',
                                     priority: 'high',
                                     badge: 1,
                                     _displayInForeground: true,

@@ -202,6 +202,8 @@ export default function UnifiedChatPage() {
                         body: text,
                         chatId: chatId,
                         senderName: currentSenderName,
+                        sound: 'slyzah_alert.mp3',
+                        channelId: 'slyzah_alert',
                         createdAt: serverTimestamp(),
                         status: "unread"
                     });

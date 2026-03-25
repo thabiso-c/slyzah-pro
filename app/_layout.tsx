@@ -52,6 +52,15 @@ async function registerForPushNotificationsAsync() {
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FF231F7C',
     });
+
+    // Custom Slyzah Alert Channel
+    await Notifications.setNotificationChannelAsync('slyzah_alert', {
+      name: 'Slyzah Alerts',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FFD700',
+      sound: 'slyzah_alert.mp3',
+    });
   }
 
   if (Device.isDevice) {
