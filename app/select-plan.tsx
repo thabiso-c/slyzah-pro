@@ -300,15 +300,14 @@ export default function SelectPlan() {
                         style={[
                             styles.planCard,
                             (selectedPlan === plan.id || plan.name === currentTier) && styles.selectedCard,
-                            (plan as any).recommended && styles.recommendedCard,
-                            (plan as any).comingSoon && styles.disabledCard
+                            (plan as any).recommended && styles.recommendedCard
                         ]}
                         onPress={() => handlePlanPress(plan)}
-                        disabled={loading || plan.name === currentTier || (plan as any).comingSoon}
+                        disabled={loading || plan.name === currentTier}
                     >
-                        {((plan as any).recommended || (plan as any).comingSoon) && (
-                            <View style={[(plan as any).comingSoon ? styles.comingSoonBadge : styles.recommendedBadge]}>
-                                <Text style={[(plan as any).comingSoon ? styles.comingSoonText : styles.recommendedText]}>{(plan as any).comingSoon ? "COMING SOON" : "RECOMMENDED"}</Text>
+                        {(plan as any).recommended && (
+                            <View style={styles.recommendedBadge}>
+                                <Text style={styles.recommendedText}>RECOMMENDED</Text>
                             </View>
                         )}
                         <View style={styles.planHeader}>
@@ -329,12 +328,12 @@ export default function SelectPlan() {
                             ))}
                         </View>
 
-                        <View style={[styles.selectButton, (plan as any).comingSoon && styles.disabledButton]}>
+                        <View style={styles.selectButton}>
                             {loading && selectedPlan === plan.id ? (
                                 <ActivityIndicator color={THEME.navy} />
                             ) : (
                                 <Text style={styles.selectButtonText}>
-                                    {(plan as any).comingSoon ? "COMING SOON" : getButtonText(plan)}
+                                    {getButtonText(plan)}
                                 </Text>
                             )}
                         </View>
@@ -437,10 +436,6 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
     },
-    disabledCard: {
-        opacity: 0.6,
-        borderColor: '#444',
-    },
     selectedCard: {
         borderColor: THEME.gold,
         backgroundColor: 'rgba(255, 215, 0, 0.05)',
@@ -459,17 +454,6 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 18,
         borderBottomLeftRadius: 12,
     },
-    comingSoonBadge: {
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        backgroundColor: '#666',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderTopRightRadius: 18,
-        borderBottomLeftRadius: 12,
-    },
-    comingSoonText: { color: '#fff', fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
     recommendedText: { color: THEME.navy, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
     planHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, flexWrap: 'wrap' },
     planName: { fontSize: 18, fontWeight: '900', color: THEME.white, textTransform: 'uppercase' },
@@ -491,9 +475,6 @@ const styles = StyleSheet.create({
     },
     navyButton: {
         backgroundColor: THEME.navy,
-    },
-    disabledButton: {
-        backgroundColor: '#F3F4F6',
     },
     selectButtonText: { fontWeight: '900', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase' },
 
