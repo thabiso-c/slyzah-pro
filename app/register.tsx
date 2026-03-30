@@ -6,7 +6,20 @@ import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
 import RNPickerSelect from 'react-native-picker-select';
 import { auth, db, storage } from '../lib/firebaseConfig';
 import { identifyAdditionalCert, verifyCIPCDocument, verifyCredentialDocument } from '../lib/ocr';
@@ -16,6 +29,8 @@ const THEME = {
     gold: '#FFD700',
     white: '#FFFFFF',
     gray: '#F3F4F6',
+    purple: '#A855F7',
+    border: '#E5E7EB'
 };
 
 const CREDENTIAL_MAPPING: Record<string, { label: string; field: string; docField: string }> = {
@@ -515,14 +530,14 @@ export default function VendorRegister() {
     );
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
             >
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color={THEME.white} />
+                        <Ionicons name="arrow-back" size={24} color={THEME.navy} />
                     </TouchableOpacity>
 
                     <Text style={styles.title}>Vendor Registration</Text>
@@ -599,7 +614,7 @@ export default function VendorRegister() {
                                 <TouchableOpacity style={[styles.fileButton, cipcVerified && styles.verifiedFileButton]} onPress={async () => {
                                     const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
                                     if (result.canceled === false) processCIPCFile(result.assets[0]);
-                                }} disabled={isVerifyingCIPC}>
+                                }} disabled={isVerifyingCIPC} activeOpacity={0.7}>
                                     {isVerifyingCIPC
                                         ? <ActivityIndicator color={THEME.navy} />
                                         : <Text style={[styles.fileButtonText, cipcVerified && { color: '#15803d' }]}>{cipcVerified ? `✓ Verified: ${cipcFile?.name}` : "Upload CIPC Document"}</Text>
@@ -653,7 +668,7 @@ export default function VendorRegister() {
                                 <TouchableOpacity style={[styles.fileButton, credentialFile && styles.verifiedFileButton]} onPress={async () => {
                                     const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
                                     if (!result.canceled) processCredentialFile(result.assets[0], credentialMapping.label);
-                                }} disabled={isVerifyingCredential}>
+                                }} disabled={isVerifyingCredential} activeOpacity={0.7}>
                                     {isVerifyingCredential
                                         ? <ActivityIndicator color={THEME.navy} />
                                         : <Text style={[styles.fileButtonText, credentialFile && { color: '#15803d' }]}>{credentialFile ? `✓ Verified: ${credentialFile.name}` : "Upload Document"}</Text>
@@ -663,7 +678,7 @@ export default function VendorRegister() {
                         )}
 
                         <View style={{ marginTop: 20 }}>
-                            <View style={[styles.sectionHeaderContainer, { borderBottomColor: 'rgba(255,255,255,0.2)' }]}>
+                            <View style={[styles.sectionHeaderContainer, { borderBottomColor: '#F3F4F6' }]}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <Text style={styles.sectionHeader}>Additional Certifications</Text>
                                     <TouchableOpacity onPress={addCertRow} style={styles.addButton}>
@@ -698,7 +713,7 @@ export default function VendorRegister() {
                                                 <TouchableOpacity style={[styles.fileButton, cert.file && styles.verifiedFileButton]} onPress={async () => {
                                                     const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
                                                     if (!result.canceled) handleCertFileChange(cert.id, result.assets[0]);
-                                                }} disabled={verifyingCertId === cert.id}>
+                                                }} disabled={verifyingCertId === cert.id} activeOpacity={0.7}>
                                                     {verifyingCertId === cert.id
                                                         ? <ActivityIndicator color={THEME.navy} />
                                                         : <Text style={[styles.fileButtonText, cert.file && { color: '#15803d' }]}>{cert.file ? `✓ ${cert.file.name}` : "Upload Proof"}</Text>
@@ -765,58 +780,60 @@ export default function VendorRegister() {
                     </TouchableOpacity>
                 </ScrollView>
             </KeyboardAvoidingView>
-        </View>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: THEME.navy },
-    scrollContent: { paddingHorizontal: 20, paddingBottom: 50 },
+    container: { flex: 1, backgroundColor: THEME.white },
+    scrollContent: { paddingHorizontal: 20, paddingBottom: 80, paddingTop: 20 },
     backButton: { marginBottom: 20 },
-    title: { fontSize: 28, fontWeight: '900', color: THEME.white, marginBottom: 5, fontStyle: 'italic', textTransform: 'uppercase' },
-    subtitle: { fontSize: 12, color: THEME.gold, marginBottom: 30, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 2 },
+    title: { fontSize: 32, fontWeight: '900', color: THEME.navy, marginBottom: 5, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: -1 },
+    subtitle: { fontSize: 12, color: '#6B7280', marginBottom: 30, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
     section: { marginBottom: 40 },
-    sectionHeaderContainer: { borderBottomWidth: 4, borderBottomColor: THEME.navy, paddingBottom: 8, marginBottom: 20 },
-    sectionHeader: { fontSize: 16, fontWeight: '900', color: THEME.white, textTransform: 'uppercase', letterSpacing: 1 },
+    sectionHeaderContainer: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6', paddingBottom: 12, marginBottom: 20 },
+    sectionHeader: { fontSize: 18, fontWeight: '900', color: THEME.navy, textTransform: 'uppercase', letterSpacing: -0.5 },
     sectionContent: { gap: 15 },
-    label: { color: THEME.white, fontSize: 10, fontWeight: '900', marginLeft: 5, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 },
-    input: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 15, padding: 16, color: THEME.white, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', fontWeight: '600' },
-    disabledInput: { backgroundColor: 'rgba(0,0,0,0.2)', color: '#999' },
+    label: { color: THEME.navy, fontSize: 10, fontWeight: '900', marginLeft: 5, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+    input: { backgroundColor: '#F9FAFB', borderRadius: 16, padding: 16, color: THEME.navy, borderWidth: 1, borderColor: '#F3F4F6', fontWeight: '700', fontSize: 14 },
+    disabledInput: { backgroundColor: '#F3F4F6', color: '#9CA3AF' },
     textArea: { height: 100, textAlignVertical: 'top' },
-    verificationCard: { backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: 15, padding: 15, gap: 5, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.3)' },
-    helperText: { color: '#9ca3af', fontSize: 11, marginLeft: 5 },
-    credentialCard: { backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: 15, padding: 15, gap: 10, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.3)' },
-    credentialTitle: { color: THEME.white, fontWeight: '900', textTransform: 'uppercase' },
-    fileButton: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 15, alignItems: 'center' },
-    fileButtonText: { color: THEME.white, fontWeight: '600', fontSize: 12 },
+    verificationCard: { backgroundColor: '#F0F7FF', borderRadius: 24, padding: 20, gap: 5, borderWidth: 1, borderColor: '#DBEAFE' },
+    helperText: { color: '#6B7280', fontSize: 11, marginLeft: 5, fontWeight: '600' },
+    credentialCard: { backgroundColor: '#F0FDF4', borderRadius: 24, padding: 20, gap: 10, borderWidth: 1, borderColor: '#DCFCE7' },
+    credentialTitle: { color: THEME.navy, fontWeight: '900', textTransform: 'uppercase', fontSize: 14 },
+    fileButton: { backgroundColor: THEME.white, borderRadius: 12, padding: 15, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed' },
+    fileButtonText: { color: THEME.navy, fontWeight: '800', fontSize: 12 },
     provinceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-    provinceItem: { paddingVertical: 12, paddingHorizontal: 16, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-    provinceItemSelected: { backgroundColor: THEME.white, borderColor: THEME.white },
-    provinceItemText: { color: THEME.white, fontWeight: 'bold', fontSize: 11, textTransform: 'uppercase' },
-    provinceItemTextSelected: { color: THEME.navy },
-    regionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, marginBottom: 10 },
-    regionHeaderText: { color: THEME.gold, fontWeight: '900', fontSize: 12, textTransform: 'uppercase' },
-    selectAllText: { color: THEME.gold, fontWeight: 'bold', fontSize: 10 },
+    provinceItem: { paddingVertical: 12, paddingHorizontal: 16, backgroundColor: '#F9FAFB', borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6' },
+    provinceItemSelected: { backgroundColor: THEME.navy, borderColor: THEME.navy },
+    provinceItemText: { color: THEME.navy, fontWeight: 'bold', fontSize: 11, textTransform: 'uppercase' },
+    provinceItemTextSelected: { color: THEME.white },
+    regionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, marginBottom: 10 },
+    regionHeaderText: { color: THEME.navy, fontWeight: '900', fontSize: 12, textTransform: 'uppercase' },
+    selectAllText: { color: '#B8860B', fontWeight: 'bold', fontSize: 10 },
     regionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    regionItem: { paddingVertical: 10, paddingHorizontal: 14, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'transparent' },
+    regionItem: { paddingVertical: 10, paddingHorizontal: 14, backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#F3F4F6' },
     regionItemSelected: { backgroundColor: THEME.gold, borderColor: THEME.gold },
-    regionItemText: { color: THEME.white, fontWeight: '600', fontSize: 10 },
+    regionItemText: { color: THEME.navy, fontWeight: '700', fontSize: 10 },
     regionItemTextSelected: { color: THEME.navy },
-    submitButton: { backgroundColor: THEME.gold, padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 20 },
+    submitButton: { backgroundColor: THEME.gold, padding: 20, borderRadius: 20, alignItems: 'center', marginTop: 20, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 },
     submitButtonText: { color: THEME.navy, fontWeight: '900', fontSize: 14, letterSpacing: 1 },
-    logoContainer: { width: 120, height: 120, borderRadius: 30, overflow: 'hidden', borderWidth: 2, borderColor: THEME.gold, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
+    logoContainer: { width: 120, height: 120, borderRadius: 32, overflow: 'hidden', borderWidth: 2, borderColor: THEME.gold, backgroundColor: '#F9FAFB', justifyContent: 'center', alignItems: 'center' },
     logoImage: { width: '100%', height: '100%' },
-    logoPlaceholder: { alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: THEME.white },
-    logoText: { color: THEME.gold, fontSize: 10, fontWeight: 'bold', marginTop: 5 },
+    logoPlaceholder: { alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' },
+    logoText: { color: '#9CA3AF', fontSize: 10, fontWeight: 'bold', marginTop: 5 },
     verifiedFileButton: { backgroundColor: '#dcfce7' },
     addButton: { backgroundColor: THEME.gold, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
     addButtonText: { color: THEME.navy, fontWeight: '900', fontSize: 10 },
     certRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        backgroundColor: '#F9FAFB',
         padding: 15,
         borderRadius: 15,
+        borderWidth: 1,
+        borderColor: '#F3F4F6'
     },
 });
 

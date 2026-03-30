@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../lib/firebaseConfig';
 
 const THEME = {
@@ -11,14 +11,72 @@ const THEME = {
     gold: '#FFD700',
     white: '#FFFFFF',
     gray: '#F3F4F6',
+    purple: '#A855F7',
+    border: '#E5E7EB'
 };
 
 const PLANS = [
-    { id: 'basic', name: "Basic", price: 0, frequency: "Free", features: ["Standard business listing", "Professional profile page", "Receive requests", "Appear in search", "3 specific regions"], trial: false },
-    { id: 'one_region', name: "One Region", price: 199, frequency: "Monthly", features: ["Priority listing in 1 region", "Verified Pro Badge", "Access to Performance Insights", "View & Reply to Customer Reviews", "Detailed Growth Reports"], trial: true },
-    { id: 'three_regions', name: "Three Regions", price: 299, frequency: "Monthly", features: ["Priority listing in 3 regions", "Verified Pro Badge", "Access to Performance Insights", "View & Reply to Customer Reviews", "Detailed Growth Reports"], trial: true },
-    { id: 'provincial', name: "Provincial", price: 599, frequency: "Monthly", features: ["Province-wide coverage", "Featured on provincial home", "Priority support", "Advanced Analytics & Insights", "Reputation Management Tools"], trial: true, recommended: true },
-    { id: 'multi_province', name: "Multi-Province", price: 1499, frequency: "Monthly", features: ["National multi-province coverage", "Verified National Partner", "Unlimited category listings", "Full Suite of Pro Tools"], trial: true }
+    {
+        id: 'basic',
+        name: "Basic",
+        price: "Free Forever",
+        description: "Perfect for new businesses just starting out.",
+        color: 'navy',
+        live: true,
+        features: ["Standard business listing", "Professional profile page", "Receive requests via the platform", "Appear in search based on reviews"],
+        trial: false
+    },
+    {
+        id: 'one_region',
+        name: "One Region",
+        price: "R199/mo",
+        description: "For professionals dominating a single suburb or region.",
+        color: 'gold',
+        live: true,
+        features: ["Be Seen First in your region", "Verified Pro Badge", "Appear in Top 8 local results", "Detailed Weekly Growth Reports"],
+        trial: true
+    },
+    {
+        id: 'three_regions',
+        name: "Three Regions",
+        price: "R399/mo",
+        description: "For professionals dominating multiple suburbs or regions.",
+        color: 'gold',
+        live: true,
+        features: ["Be Seen First in 3 regions", "Verified Pro Badge", "Appear in Top 8 local results", "Detailed Weekly Growth Reports"],
+        trial: true
+    },
+    {
+        id: 'provincial',
+        name: "Provincial",
+        price: "R599/mo",
+        description: "Scale across multiple regions in one province.",
+        color: 'gold',
+        live: true,
+        features: ["Coverage for an entire province", "Everything in 'One Region' plan", "Featured Pro on provincial home page", "Priority support line"],
+        trial: true,
+        recommended: true
+    },
+    {
+        id: 'multi_province',
+        name: "Multi-Province",
+        price: "R1499/mo",
+        description: "National coverage for large service businesses.",
+        color: 'gold',
+        live: true,
+        features: ["Unlimited multi-province coverage", "Everything in 'Provincial' plan", "Verified National Partner status", "Unlimited category listings"],
+        trial: true
+    },
+    {
+        id: 'premium',
+        name: "Premium",
+        price: "Coming Soon",
+        description: "Enterprise features for large service companies.",
+        color: 'gray',
+        live: false,
+        features: ["Guaranteed Top 3 Search Ranking", "Personal Account Manager", "Video Header for your profile", "Zero lead commission fees"],
+        trial: false
+    }
 ];
 
 // Replace with your actual PayFast Merchant ID and Key
@@ -75,15 +133,89 @@ function calculateSubscription(monthlyPrice: number, isTrial: boolean = false) {
     }
 }
 
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: THEME.white },
+    scrollContent: { padding: 20, paddingBottom: 80 },
+    header: { alignItems: 'center', marginBottom: 40, marginTop: 40 },
+    logo: { width: 60, height: 60, marginBottom: 20, opacity: 0.6 },
+    headerTitle: { fontSize: 32, fontWeight: '900', color: THEME.navy, fontStyle: 'italic', textTransform: 'uppercase', textAlign: 'center' },
+    headerSubtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginTop: 10, fontWeight: '500', maxWidth: 300 },
+
+    planCard: {
+        backgroundColor: THEME.white,
+        borderRadius: 32,
+        marginBottom: 24,
+        borderWidth: 2,
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 15,
+        overflow: 'hidden'
+    },
+    goldBorder: { borderColor: THEME.gold },
+    grayBorder: { borderColor: '#F3F4F6' },
+    dimmed: { opacity: 0.6 },
+    cardPadding: { padding: 24 },
+
+    comingSoonBadge: { position: 'absolute', top: 0, right: 0, backgroundColor: '#6B7280', paddingHorizontal: 12, paddingVertical: 4, borderBottomLeftRadius: 16, zIndex: 10 },
+    comingSoonText: { color: THEME.white, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+
+    planName: { fontSize: 24, fontWeight: '900', color: THEME.navy, textTransform: 'uppercase', letterSpacing: -1 },
+    planDescription: { fontSize: 10, fontWeight: '800', color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 16, height: 30 },
+
+    priceContainer: { marginBottom: 24, borderBottomWidth: 1, borderBottomColor: '#F9FAFB', paddingBottom: 24 },
+    priceRow: { flexDirection: 'row', alignItems: 'baseline' },
+    priceValue: { fontSize: 32, fontWeight: '900', color: THEME.navy, letterSpacing: -1 },
+    moLabel: { fontSize: 12, fontWeight: '800', color: '#9CA3AF', marginLeft: 4 },
+
+    trialInfo: { marginTop: 8 },
+    standardPrice: { fontSize: 11, fontWeight: '800', color: '#9CA3AF', textDecorationLine: 'line-through' },
+    trialBadgeRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+    pulseDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: THEME.purple, marginRight: 6 },
+    trialLabel: { fontSize: 10, fontWeight: '900', color: THEME.purple, textTransform: 'uppercase' },
+
+    featuresContainer: { gap: 12 },
+    featureRow: { flexDirection: 'row', alignItems: 'flex-start' },
+    checkCircle: { width: 14, height: 14, borderRadius: 7, justifyContent: 'center', alignItems: 'center', marginTop: 2, marginRight: 8 },
+    goldBg: { backgroundColor: THEME.gold },
+    navyBg: { backgroundColor: THEME.navy },
+    featureText: { fontSize: 11, fontWeight: '800', color: THEME.navy, flex: 1, lineHeight: 16 },
+
+    selectButton: { margin: 16, paddingVertical: 18, borderRadius: 20, alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 },
+    goldBtn: { backgroundColor: THEME.gold },
+    navyBtn: { backgroundColor: THEME.navy },
+    disabledBtn: { backgroundColor: '#F3F4F6' },
+    selectButtonText: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+    navyText: { color: THEME.navy },
+    whiteText: { color: THEME.white },
+
+    termsBox: { backgroundColor: '#F9FAFB', borderRadius: 32, padding: 24, borderWidth: 1, borderColor: '#E5E7EB' },
+    termsHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+    termsHeaderTitle: { fontSize: 11, fontWeight: '900', color: THEME.navy, marginLeft: 8, letterSpacing: 1 },
+    termsScroll: { height: 120, marginBottom: 20 },
+    termParagraph: { fontSize: 10, fontWeight: '600', color: '#6B7280', lineHeight: 16, marginBottom: 12 },
+    checkboxRow: { flexDirection: 'row', alignItems: 'center' },
+    checkboxLabel: { fontSize: 10, fontWeight: '900', color: THEME.navy, marginLeft: 12, flex: 1, textTransform: 'uppercase', letterSpacing: -0.2 },
+
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,31,63,0.95)', justifyContent: 'center', padding: 20 },
+    modalContent: { backgroundColor: THEME.white, borderRadius: 32, padding: 24 },
+    modalTitle: { fontSize: 24, fontWeight: '900', color: THEME.navy, textTransform: 'uppercase', marginBottom: 8 },
+    modalSubtitle: { fontSize: 14, color: '#6B7280', marginBottom: 20, fontWeight: '600' },
+    modalButtons: { flexDirection: 'row', gap: 12 },
+    cancelButton: { flex: 1, padding: 18, borderRadius: 20, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center' },
+    cancelButtonText: { color: '#9CA3AF', fontWeight: '900', fontSize: 12 },
+    acceptButton: { flex: 1, backgroundColor: THEME.gold, padding: 18, borderRadius: 20, alignItems: 'center' },
+    acceptButtonText: { color: THEME.navy, fontWeight: '900', fontSize: 12 }
+});
+
 export default function SelectPlan() {
     const router = useRouter();
     const params = useLocalSearchParams();
     const [loading, setLoading] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
     const [currentTier, setCurrentTier] = useState<string | null>(null);
-    const [termsVisible, setTermsVisible] = useState(false);
-    const [termsAccepted, setTermsAccepted] = useState(false);
-    const [pendingPlan, setPendingPlan] = useState<typeof PLANS[0] | null>(null);
+    const [agreedToTerms, setAgreedToTerms] = useState(false);
+    const [selectingId, setSelectingId] = useState<string | null>(null);
     const [downgradeModalVisible, setDowngradeModalVisible] = useState(false);
 
     // Fetch Current Plan
@@ -159,32 +291,29 @@ export default function SelectPlan() {
     }, [params.action, params.tier]);
 
     const handlePlanPress = (plan: typeof PLANS[0]) => {
+        if (!plan.live) return;
         if (plan.name === currentTier) {
             Alert.alert("Current Plan", "You are already subscribed to this plan.");
             return;
         }
 
-        const currentPlanObj = PLANS.find(p => p.name === currentTier);
-        const currentPrice = currentPlanObj ? currentPlanObj.price : 0;
-
-        // Check for Downgrade
-        if (plan.price < currentPrice) {
-            setPendingPlan(plan);
-            setDowngradeModalVisible(true);
+        if (!agreedToTerms && plan.id !== 'basic') {
+            Alert.alert("Terms Required", "Please read and agree to the Subscription Terms at the bottom of the page.");
             return;
         }
 
-        initiateSelection(plan);
-    };
+        // Note: Simple price comparison for downgrade warning
+        const currentPrice = PLANS.find(p => p.name === currentTier)?.price;
+        const numericCurrentPrice = typeof currentPrice === 'number' ? currentPrice : 0;
+        const numericNewPrice = typeof plan.price === 'number' ? plan.price : (plan.id === 'basic' ? 0 : parseInt(plan.price.replace(/\D/g, '')));
 
-    const initiateSelection = (plan: typeof PLANS[0]) => {
-        if (plan.price > 0) {
-            setPendingPlan(plan);
-            setTermsAccepted(false);
-            setTermsVisible(true);
-        } else {
-            processPlanSelection(plan);
+        if (numericNewPrice < numericCurrentPrice) {
+            setDowngradeModalVisible(true);
+            setSelectingId(plan.id);
+            return;
         }
+
+        processPlanSelection(plan);
     };
 
     const processPlanSelection = async (plan: typeof PLANS[0]) => {
@@ -196,10 +325,12 @@ export default function SelectPlan() {
             return;
         }
 
-        setSelectedPlan(plan.id);
+        setSelectingId(plan.id);
         setLoading(true);
 
         try {
+            const numericPrice = typeof plan.price === 'number' ? plan.price : (plan.id === 'basic' ? 0 : parseInt(plan.price.replace(/\D/g, '')));
+
             // 1. Update Profile with Pending Plan
             await updateDoc(doc(db, "professionals", user.uid), {
                 pendingTier: plan.name,
@@ -207,7 +338,7 @@ export default function SelectPlan() {
             });
 
             // 2. Handle Free Plan
-            if (plan.price === 0) {
+            if (numericPrice === 0) {
                 await updateDoc(doc(db, "professionals", user.uid), {
                     tier: plan.name,
                     pendingTier: null,
@@ -219,7 +350,7 @@ export default function SelectPlan() {
             }
 
             // 3. Handle Paid Plan (PayFast Integration)
-            const { initialAmount, recurringAmount, billingDate } = calculateSubscription(plan.price, plan.trial);
+            const { initialAmount, recurringAmount, billingDate } = calculateSubscription(numericPrice, plan.trial);
 
             // Data to send to your backend API to generate a signed URL
             const payload = {
@@ -275,128 +406,128 @@ export default function SelectPlan() {
     const getButtonText = (plan: typeof PLANS[0]) => {
         if (plan.name === currentTier) return "CURRENT PLAN";
 
-        const currentPlanObj = PLANS.find(p => p.name === currentTier);
-
-        if (currentPlanObj) {
-            if (plan.price > currentPlanObj.price) return "UPGRADE";
-            if (plan.price < currentPlanObj.price) return "DOWNGRADE";
-        }
-
-        // For new vendors or if prices are the same
-        return `CHOOSE ${plan.name.toUpperCase()}`;
+        if (plan.trial) return "START 30-DAY TRIAL";
+        if (plan.id === 'basic') return "START FOR FREE";
+        return "SELECT PLAN";
     };
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Select Your Plan</Text>
-                <Text style={styles.headerSubtitle}>Choose the best tier for your business</Text>
-            </View>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.header}>
+                    <Image source={require('../assets/splash-icon.png')} style={styles.logo} resizeMode="contain" />
+                    <Text style={styles.headerTitle}>SCALE YOUR BUSINESS</Text>
+                    <Text style={styles.headerSubtitle}>Expand your reach across South Africa. Choose the geographic tier that fits your service area.</Text>
+                </View>
 
-            <ScrollView contentContainerStyle={styles.scrollContent}>
                 {PLANS.map((plan) => (
-                    <TouchableOpacity
+                    <View
                         key={plan.id}
                         style={[
                             styles.planCard,
-                            (selectedPlan === plan.id || plan.name === currentTier) && styles.selectedCard,
-                            (plan as any).recommended && styles.recommendedCard
+                            plan.color === 'gold' ? styles.goldBorder : styles.grayBorder,
+                            !plan.live && styles.dimmed
                         ]}
-                        onPress={() => handlePlanPress(plan)}
-                        disabled={loading || plan.name === currentTier}
                     >
-                        {(plan as any).recommended && (
-                            <View style={styles.recommendedBadge}>
-                                <Text style={styles.recommendedText}>RECOMMENDED</Text>
+                        {!plan.live && (
+                            <View style={styles.comingSoonBadge}>
+                                <Text style={styles.comingSoonText}>COMING SOON</Text>
                             </View>
                         )}
-                        <View style={styles.planHeader}>
+                        <View style={styles.cardPadding}>
                             <Text style={styles.planName}>{plan.name}</Text>
-                            <Text style={styles.planPrice}>
-                                {plan.price === 0 ? "Free" : `R${plan.price}`}
-                                {plan.price > 0 && <Text style={styles.frequency}>/mo</Text>}
-                            </Text>
-                            {plan.trial && <Text style={styles.trialText}>30-Day Free Trial</Text>}
-                        </View>
+                            <Text style={styles.planDescription}>{plan.description}</Text>
 
-                        <View style={styles.featuresContainer}>
-                            {plan.features.map((feature, index) => (
-                                <View key={index} style={styles.featureRow}>
-                                    <Ionicons name="checkmark-circle" size={16} color={THEME.gold} />
-                                    <Text style={styles.featureText}>{feature}</Text>
+                            {/* PRICE SECTION */}
+                            <View style={styles.priceContainer}>
+                                <View style={styles.priceRow}>
+                                    <Text style={styles.priceValue}>
+                                        {plan.trial ? "R5.00" : plan.price}
+                                    </Text>
+                                    {plan.live && plan.id !== 'basic' && (
+                                        <Text style={styles.moLabel}>/mo</Text>
+                                    )}
                                 </View>
-                            ))}
+
+                                {plan.trial && (
+                                    <View style={styles.trialInfo}>
+                                        <Text style={styles.standardPrice}>Standard: {plan.price}</Text>
+                                        <View style={styles.trialBadgeRow}>
+                                            <View style={styles.pulseDot} />
+                                            <Text style={styles.trialLabel}>30-Day Trial (R5 Setup Fee)</Text>
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
+
+                            <View style={styles.featuresContainer}>
+                                {plan.features.map((feature, index) => (
+                                    <View key={index} style={styles.featureRow}>
+                                        <View style={[styles.checkCircle, plan.color === 'gold' ? styles.goldBg : styles.navyBg]}>
+                                            <Ionicons name="checkmark" size={10} color={THEME.white} />
+                                        </View>
+                                        <Text style={styles.featureText}>{feature}</Text>
+                                    </View>
+                                ))}
+                            </View>
                         </View>
 
-                        <View style={styles.selectButton}>
-                            {loading && selectedPlan === plan.id ? (
-                                <ActivityIndicator color={THEME.navy} />
+                        <TouchableOpacity
+                            disabled={!plan.live || loading}
+                            style={[
+                                styles.selectButton,
+                                plan.color === 'gold' ? styles.goldBtn : (plan.live ? styles.navyBtn : styles.disabledBtn)
+                            ]}
+                            onPress={() => handlePlanPress(plan)}
+                        >
+                            {loading && selectingId === plan.id ? (
+                                <ActivityIndicator color={plan.color === 'gold' ? THEME.navy : THEME.white} />
                             ) : (
-                                <Text style={styles.selectButtonText}>
+                                <Text style={[styles.selectButtonText, plan.color === 'gold' ? styles.navyText : styles.whiteText]}>
                                     {getButtonText(plan)}
                                 </Text>
                             )}
-                        </View>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
-
-            {/* TERMS MODAL */}
-            <Modal visible={termsVisible} animationType="slide" transparent>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Growth Plan Terms</Text>
-                        <Text style={styles.modalSubtitle}>Please review and accept the terms to proceed.</Text>
-
-                        <ScrollView style={styles.termsScroll}>
-                            {GROWTH_PLAN_TERMS.map((term, index) => (
-                                <Text key={index} style={styles.termText}>{term}</Text>
-                            ))}
-                        </ScrollView>
-
-                        <TouchableOpacity
-                            style={styles.checkboxContainer}
-                            onPress={() => setTermsAccepted(!termsAccepted)}
-                        >
-                            <Ionicons
-                                name={termsAccepted ? "checkbox" : "square-outline"}
-                                size={24}
-                                color={termsAccepted ? THEME.gold : THEME.white}
-                            />
-                            <Text style={styles.checkboxText}>I accept the subscription terms</Text>
                         </TouchableOpacity>
-
-                        <View style={styles.modalButtons}>
-                            <TouchableOpacity style={styles.cancelButton} onPress={() => setTermsVisible(false)}>
-                                <Text style={styles.cancelButtonText}>CANCEL</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.acceptButton, !termsAccepted && styles.modalDisabledButton]}
-                                onPress={() => {
-                                    setTermsVisible(false);
-                                    if (pendingPlan) processPlanSelection(pendingPlan);
-                                }}
-                                disabled={!termsAccepted}
-                            >
-                                <Text style={styles.acceptButtonText}>CONTINUE</Text>
-                            </TouchableOpacity>
-                        </View>
                     </View>
+                ))}
+
+                {/* TERMS BOX */}
+                <View style={styles.termsBox}>
+                    <View style={styles.termsHeaderRow}>
+                        <Ionicons name="shield-checkmark" size={16} color="#B8860B" />
+                        <Text style={styles.termsHeaderTitle}>GROWTH PLAN SUBSCRIPTION TERMS</Text>
+                    </View>
+                    <ScrollView style={styles.termsScroll} nestedScrollEnabled={true}>
+                        {GROWTH_PLAN_TERMS.map((term, index) => (
+                            <Text key={index} style={styles.termParagraph}>{term}</Text>
+                        ))}
+                    </ScrollView>
+                    <TouchableOpacity
+                        style={styles.checkboxRow}
+                        onPress={() => setAgreedToTerms(!agreedToTerms)}
+                    >
+                        <Ionicons
+                            name={agreedToTerms ? "checkbox" : "square-outline"}
+                            size={20}
+                            color={THEME.navy}
+                        />
+                        <Text style={styles.checkboxLabel}>I AGREE TO THE SUBSCRIPTION TERMS AND AUTHORIZE RECURRING MONTHLY BILLING.</Text>
+                    </TouchableOpacity>
                 </View>
-            </Modal>
+            </ScrollView>
 
             {/* DOWNGRADE WARNING MODAL */}
             <Modal visible={downgradeModalVisible} animationType="fade" transparent>
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { borderColor: '#EF4444' }]}>
+                    <View style={[styles.modalContent, { borderColor: '#EF4444', borderWidth: 1 }]}>
                         <View style={{ alignItems: 'center', marginBottom: 15 }}>
                             <Ionicons name="warning" size={48} color="#EF4444" />
                         </View>
                         <Text style={[styles.modalTitle, { color: '#EF4444', textAlign: 'center' }]}>Warning: Downgrade</Text>
                         <Text style={[styles.modalSubtitle, { textAlign: 'center' }]}>
-                            You are about to downgrade to the <Text style={{ fontWeight: 'bold', color: THEME.white }}>{pendingPlan?.name}</Text> plan.
+                            You are about to downgrade your plan.
                         </Text>
-                        <Text style={[styles.termText, { textAlign: 'center', marginBottom: 20 }]}>
+                        <Text style={[styles.termParagraph, { textAlign: 'center', marginBottom: 20 }]}>
                             This action will limit your access to leads, reduce your coverage area, and remove premium features. Are you sure you want to proceed?
                         </Text>
 
@@ -408,7 +539,8 @@ export default function SelectPlan() {
                                 style={[styles.acceptButton, { backgroundColor: '#EF4444' }]}
                                 onPress={() => {
                                     setDowngradeModalVisible(false);
-                                    if (pendingPlan) initiateSelection(pendingPlan);
+                                    const plan = PLANS.find(p => p.id === selectingId);
+                                    if (plan) processPlanSelection(plan);
                                 }}
                             >
                                 <Text style={[styles.acceptButtonText, { color: THEME.white }]}>CONFIRM DOWNGRADE</Text>
@@ -420,89 +552,3 @@ export default function SelectPlan() {
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: THEME.navy },
-    header: { padding: 20, paddingTop: 60, alignItems: 'center' },
-    headerTitle: { fontSize: 24, fontWeight: '900', color: THEME.white, textTransform: 'uppercase' },
-    headerSubtitle: { fontSize: 12, color: THEME.gold, marginTop: 5, fontWeight: 'bold' },
-    scrollContent: { padding: 20, paddingBottom: 50 },
-
-    planCard: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderRadius: 20,
-        padding: 20,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-    },
-    selectedCard: {
-        borderColor: THEME.gold,
-        backgroundColor: 'rgba(255, 215, 0, 0.05)',
-    },
-    recommendedCard: {
-        borderColor: THEME.gold,
-        borderWidth: 2,
-    },
-    recommendedBadge: {
-        position: 'absolute',
-        top: 0,
-        right: 0,
-        backgroundColor: THEME.gold,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderTopRightRadius: 18,
-        borderBottomLeftRadius: 12,
-    },
-    recommendedText: { color: THEME.navy, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
-    planHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, flexWrap: 'wrap' },
-    planName: { fontSize: 18, fontWeight: '900', color: THEME.white, textTransform: 'uppercase' },
-    planPrice: { fontSize: 20, fontWeight: '900', color: THEME.gold },
-    frequency: { fontSize: 10, color: '#999' },
-    trialText: { fontSize: 10, color: '#10B981', fontWeight: 'bold', width: '100%', marginTop: 5, textTransform: 'uppercase' },
-
-    featuresContainer: { gap: 8, marginBottom: 20 },
-    featureRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    featureText: { color: THEME.navy, fontSize: 11, fontWeight: 'bold' },
-
-    selectButton: {
-        padding: 15,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
-    goldButton: {
-        backgroundColor: THEME.gold,
-    },
-    navyButton: {
-        backgroundColor: THEME.navy,
-    },
-    selectButtonText: { fontWeight: '900', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase' },
-
-    // Terms Box
-    termsBox: {
-        backgroundColor: '#F9FAFB',
-        borderRadius: 20,
-        padding: 20,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        marginTop: 20,
-    },
-    termsHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
-    termsTitle: { fontSize: 12, fontWeight: '900', color: THEME.navy, textTransform: 'uppercase', letterSpacing: 0.5 },
-    termsScroll: { maxHeight: 150, marginBottom: 15 },
-    termText: { fontSize: 10, color: '#6B7280', marginBottom: 8, lineHeight: 16 },
-    checkboxContainer: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    checkboxText: { fontSize: 12, fontWeight: 'bold', color: THEME.navy, flex: 1 },
-
-    // Modal Styles
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,31,63,0.95)', justifyContent: 'center', padding: 20 },
-    modalContent: { backgroundColor: THEME.white, borderRadius: 20, padding: 20, maxHeight: '80%' },
-    modalTitle: { fontSize: 20, fontWeight: '900', color: THEME.navy, textTransform: 'uppercase', marginBottom: 5 },
-    modalSubtitle: { fontSize: 12, color: '#ccc', marginBottom: 15 },
-    modalButtons: { flexDirection: 'row', gap: 10 },
-    cancelButton: { flex: 1, padding: 15, borderRadius: 12, borderWidth: 1, borderColor: '#666', alignItems: 'center' },
-    cancelButtonText: { color: '#ccc', fontWeight: 'bold' },
-    acceptButton: { flex: 1, backgroundColor: THEME.gold, padding: 15, borderRadius: 12, alignItems: 'center' },
-    modalDisabledButton: { backgroundColor: '#555' },
-    acceptButtonText: { color: THEME.navy, fontWeight: '900' },
-});
