@@ -175,11 +175,19 @@ export default function ProfileScreen() {
 
     const handleSave = async () => {
         const user = auth.currentUser;
-        if (!user) return;
+        if (!user || saving) return;
+
+        // Input Validation
+        if (formData.name.length < 2) {
+            Alert.alert("Validation Error", "Business name is too short.");
+            return;
+        }
 
         setSaving(true);
         try {
-            let logoUrl = profile.logo; // Keep old logo by default
+            // Sanitization
+            const sanitizedName = formData.name.trim().replace(/[<>]/g, "");
+            let logoUrl = profile.logo;
 
             // If a new logo was picked (it's a local file URI)
             if (logoUri && logoUri.startsWith('file://')) {
@@ -190,13 +198,14 @@ export default function ProfileScreen() {
                 logoUrl = await getDownloadURL(snapshot.ref);
             }
 
+            // Security: Always use user.uid from the Auth state, never from a prop or URL
             const docRef = doc(db, "professionals", user.uid);
             await updateDoc(docRef, {
-                name: formData.name,
-                phone: formData.phone,
-                email: formData.email,
-                fullCategoryDescription: formData.fullCategoryDescription,
-                website: formData.website,
+                name: sanitizedName,
+                phone: formData.phone.trim(),
+                email: formData.email.toLowerCase().trim(),
+                fullCategoryDescription: formData.fullCategoryDescription.trim(),
+                website: formData.website.trim(),
                 additionalCerts: formData.additionalCerts,
                 logo: logoUrl,
             });

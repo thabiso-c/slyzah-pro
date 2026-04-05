@@ -153,13 +153,19 @@ export default function UnifiedChatPage() {
     };
 
     const handleSendMessage = async () => {
-        if (!newMessage.trim() || !user || !chatMeta) return;
+        if (!newMessage.trim() || !user || !chatMeta || loading) return;
 
-        const text = newMessage.trim();
+        // Sanitization
+        const text = newMessage.trim().replace(/[<>]/g, "");
         setNewMessage("");
         handleTyping(false);
 
         try {
+            // Authorization: Re-verify that the current user is part of this specific chat before writing
+            if (user.uid !== chatMeta.customerId && user.uid !== chatMeta.vendorId && user.uid !== chatMeta.vendorUid) {
+                throw new Error("Access Denied");
+            }
+
             const isVendor = isVendorView;
             const currentSenderName = isVendor
                 ? (chatMeta.vendorName || "Professional")
@@ -220,6 +226,10 @@ export default function UnifiedChatPage() {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={THEME.gold} />
+                <Text style={{ marginTop: 20, color: THEME.navy, fontWeight: 'bold' }}>SECURE LINK ESTABLISHING...</Text>
+                <TouchableOpacity onPress={() => router.replace('/dashboard')} style={{ marginTop: 20 }}>
+                    <Text style={{ color: '#999', fontSize: 12 }}>Cancel & Return</Text>
+                </TouchableOpacity>
             </View>
         );
     }
