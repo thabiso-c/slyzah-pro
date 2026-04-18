@@ -1,6 +1,7 @@
 {
     "cli": {
-        "version": ">= 10.0.0"
+        "version": ">= 10.0.0",
+        "appVersionSource": "remote"
     },
     "build": {
         "development": {
@@ -11,11 +12,18 @@
             "distribution": "internal",
             "android": {
                 "buildType": "apk"
+            },
+            "env": {
+                "GOOGLE_SERVICES_JSON": "GOOGLE_SERVICES_JSON",
+                "KOTLIN_VERSION": "2.0.21"
             }
         },
         "production": {
             "android": {
                 "buildType": "app-bundle"
+            },
+            "env": {
+                "GOOGLE_SERVICES_JSON": "GOOGLE_SERVICES_JSON"
             }
         }
     },

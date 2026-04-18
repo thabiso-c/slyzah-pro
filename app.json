@@ -15,7 +15,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.slyzah.pro",
-      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
@@ -28,7 +27,6 @@
         "backgroundColor": "#001f3f"
       },
       "package": "com.slyzah.pro",
-      "googleServicesFile": "./google-services.json",
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "WAKE_LOCK"
@@ -53,7 +51,7 @@
         "expo-build-properties",
         {
           "android": {
-            "kotlinVersion": "1.9.25"
+            "kotlinVersion": "2.0.21"
           }
         }
       ]
@@ -61,8 +59,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "6aa0e2e5-5b29-49f6-af32-9da7657870fc"
+        "projectId": "36793b52-3b0f-4382-aa29-c3a867184961"
       }
-    }
+    },
+    "owner": "thabilet"
   }
 }
