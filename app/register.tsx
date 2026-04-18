@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import RNPickerSelect from 'react-native-picker-select';
 import { auth, db, storage } from '../lib/firebaseConfig';
-import { identifyAdditionalCert, verifyCIPCDocument, verifyCredentialDocument } from '../lib/ocr';
+// OCR imports removed to scrap auto-scan
 
 const THEME = {
     navy: '#001f3f',
@@ -197,7 +197,7 @@ export default function VendorRegister() {
     const [regions, setRegions] = useState<string[]>([]);
     const [logoUri, setLogoUri] = useState<string | null>(null);
     const [regNumber, setRegNumber] = useState('');
-    const [isVerifyingCIPC, setIsVerifyingCIPC] = useState(false);
+    const [isUploadingCIPC, setIsUploadingCIPC] = useState(false);
     const [cipcVerified, setCipcVerified] = useState(false);
     const [cipcFile, setCipcFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
     const [credentialFile, setCredentialFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
@@ -205,7 +205,6 @@ export default function VendorRegister() {
     const [isVerifyingCredential, setIsVerifyingCredential] = useState(false);
     const [showCustomCategory, setShowCustomCategory] = useState(false);
     const [additionalCerts, setAdditionalCerts] = useState<{ id: string; name: string; file: DocumentPicker.DocumentPickerAsset | null; url: string | null; isCustom: boolean }[]>([]);
-    const [verifyingCertId, setVerifyingCertId] = useState<string | null>(null);
 
 
     const [formData, setFormData] = useState({
@@ -229,8 +228,8 @@ export default function VendorRegister() {
     }, [formData.category, formData.customCategory]);
 
     const handleRegister = async () => {
-        if (!cipcVerified || !regNumber) {
-            Alert.alert("Verification Required", "Please upload and verify your CIPC document before proceeding.");
+        if (!regNumber) {
+            Alert.alert("Information Required", "Please enter your CIPC business registration number.");
             return;
         }
 
@@ -370,46 +369,28 @@ export default function VendorRegister() {
         }
     };
 
-    const processCIPCFile = async (file: DocumentPicker.DocumentPickerAsset) => {
-        setIsVerifyingCIPC(true);
+    const processCIPCFile = (file: DocumentPicker.DocumentPickerAsset) => {
         try {
-            // NOTE: The OCR function needs a native implementation. This is a placeholder call.
-            const result = await verifyCIPCDocument(file);
-
-            if (result.registrationNumber) {
-                setRegNumber(result.registrationNumber);
-                if (result.vendorName) {
-                    setFormData(prev => ({ ...prev, businessName: result.vendorName as string }));
-                }
-                setCipcVerified(true);
-                setCipcFile(file);
-                Alert.alert("Success", `Successfully scanned: ${result.registrationNumber}`);
-            } else {
-                throw new Error(result.error || "Could not find a valid Registration Number.");
-            }
+            setCipcFile(file);
+            // We mark as "verified" locally just to show the UI checkmark, 
+            // actual verification happens via manual admin review of the uploaded doc.
+            setCipcVerified(true);
+            Alert.alert("Document Attached", `${file.name} has been added to your application.`);
         } catch (error: any) {
-            Alert.alert("Verification Failed", error.message || "Scan failed. Please upload a clear CIPC document.");
+            Alert.alert("Error", "Could not attach file.");
             setCipcVerified(false);
             setCipcFile(null);
-        } finally {
-            setIsVerifyingCIPC(false);
         }
     };
 
-    const processCredentialFile = async (file: DocumentPicker.DocumentPickerAsset, label: string) => {
+    const processCredentialFile = (file: DocumentPicker.DocumentPickerAsset, label: string) => {
         setIsVerifyingCredential(true);
         try {
-            const result = await verifyCredentialDocument(file, label);
-            if (result.number) {
-                setFormData(prev => ({ ...prev, credentialNumber: result.number || '' }));
-                setCredentialVerified(true);
-                setCredentialFile(file);
-                Alert.alert("Success", `Successfully scanned ${label}: ${result.number}`);
-            } else {
-                throw new Error(result.error || `Could not find a valid ${label} Number.`);
-            }
+            setCredentialFile(file);
+            setCredentialVerified(true); // Flag for admin that proof is attached
+            Alert.alert("Document Attached", `${label} proof has been added.`);
         } catch (error: any) {
-            Alert.alert("Verification Failed", error.message || "Scan failed. Please upload a clear document.");
+            Alert.alert("Error", "Could not attach file.");
             setCredentialVerified(false);
             setCredentialFile(null);
         } finally {
@@ -510,23 +491,7 @@ export default function VendorRegister() {
 
     const handleCertFileChange = async (id: string, file: DocumentPicker.DocumentPickerAsset) => {
         setAdditionalCerts(prev => prev.map(c => c.id === id ? { ...c, file } : c));
-
-        setVerifyingCertId(id);
-        try {
-            const result = await identifyAdditionalCert(file);
-            if (result.type) {
-                const certName = result.number ? `${result.type} - ${result.number}` : result.type;
-                setAdditionalCerts(prev => prev.map(c => {
-                    if (c.id === id && !c.name) { // Only auto-fill if user hasn't typed a name
-                        return { ...c, name: certName, isCustom: !SUGGESTED_CREDENTIALS.includes(result.type!) };
-                    }
-                    return c;
-                }));
-                Alert.alert("Document Identified", `Scanned: ${certName}`);
-            }
-        } finally {
-            setVerifyingCertId(null);
-        }
+        Alert.alert("File Attached", `Certification proof added.`);
     };
 
     return (
@@ -603,19 +568,20 @@ export default function VendorRegister() {
                     <Section number={3} title="Service Capabilities">
                         <View style={styles.verificationCard}>
                             <Text style={styles.label}>CIPC Registration (Required)</Text>
-                            <Text style={styles.helperText}>Upload your CIPC/BizProfile document. We'll scan it for you.</Text>
+                            <Text style={styles.helperText}>Enter your registration number and upload the document for verification.</Text>
                             <View style={{ gap: 10, marginTop: 10 }}>
                                 <TextInput
-                                    style={[styles.input, styles.disabledInput]}
-                                    placeholder="Registration Number (from scan)"
+                                    style={styles.input}
+                                    placeholder="Registration Number (e.g. 2024/123456/07)"
+                                    placeholderTextColor="#999"
                                     value={regNumber}
-                                    editable={false}
+                                    onChangeText={setRegNumber}
                                 />
                                 <TouchableOpacity style={[styles.fileButton, cipcVerified && styles.verifiedFileButton]} onPress={async () => {
                                     const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
                                     if (result.canceled === false) processCIPCFile(result.assets[0]);
-                                }} disabled={isVerifyingCIPC} activeOpacity={0.7}>
-                                    {isVerifyingCIPC
+                                }} disabled={isUploadingCIPC} activeOpacity={0.7}>
+                                    {isUploadingCIPC
                                         ? <ActivityIndicator color={THEME.navy} />
                                         : <Text style={[styles.fileButtonText, cipcVerified && { color: '#15803d' }]}>{cipcVerified ? `✓ Verified: ${cipcFile?.name}` : "Upload CIPC Document"}</Text>
                                     }
@@ -625,10 +591,9 @@ export default function VendorRegister() {
 
                         <Text style={styles.label}>Trading Name</Text>
                         <TextInput
-                            style={[styles.input, cipcVerified && styles.disabledInput]}
+                            style={styles.input}
                             placeholder="Your Business Name"
                             value={formData.businessName}
-                            editable={!cipcVerified}
                             onChangeText={(t) => setFormData({ ...formData, businessName: t })}
                         />
 
@@ -713,11 +678,8 @@ export default function VendorRegister() {
                                                 <TouchableOpacity style={[styles.fileButton, cert.file && styles.verifiedFileButton]} onPress={async () => {
                                                     const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
                                                     if (!result.canceled) handleCertFileChange(cert.id, result.assets[0]);
-                                                }} disabled={verifyingCertId === cert.id} activeOpacity={0.7}>
-                                                    {verifyingCertId === cert.id
-                                                        ? <ActivityIndicator color={THEME.navy} />
-                                                        : <Text style={[styles.fileButtonText, cert.file && { color: '#15803d' }]}>{cert.file ? `✓ ${cert.file.name}` : "Upload Proof"}</Text>
-                                                    }
+                                                }} activeOpacity={0.7}>
+                                                    <Text style={[styles.fileButtonText, cert.file && { color: '#15803d' }]}>{cert.file ? `✓ ${cert.file.name}` : "Upload Proof"}</Text>
                                                 </TouchableOpacity>
                                             </View>
                                             <TouchableOpacity onPress={() => removeCertRow(cert.id)} style={{ padding: 5, marginLeft: 10 }}>

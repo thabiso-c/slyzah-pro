@@ -6,7 +6,6 @@ import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { verifyCipcBusiness } from '../lib/api_client';
 import { auth, db, storage } from '../lib/firebaseConfig';
 
 const THEME = {
@@ -321,24 +320,15 @@ export default function ProfileScreen() {
     };
 
     const handleCipcVerification = async () => {
+        if (!cipcRegNumber) return;
         setCipcVerificationLoading(true);
         try {
-            const verificationData = await verifyCipcBusiness(cipcRegNumber);
-
             const user = auth.currentUser;
             if (user) {
                 const docRef = doc(db, "professionals", user.uid);
-                await updateDoc(docRef, {
-                    cipcVerified: true,
-                    cipcEnterpriseName: verificationData.enterpriseName,
-                    // You can add more fields from the verificationData here
-                });
-                setProfile({ ...profile, cipcVerified: true, cipcEnterpriseName: verificationData.enterpriseName });
-                Alert.alert("CIPC Verification", "Business successfully verified!");
+                await updateDoc(docRef, { cipcRegistrationNumber: cipcRegNumber });
+                Alert.alert("Profile Update", "Business registration number has been updated.");
             }
-        } catch (error: any) {
-            console.error("CIPC Verification Error:", error);
-            Alert.alert("CIPC Verification Failed", error.message || "Could not verify business. Please check the registration number and try again.");
         } finally {
             setCipcVerificationLoading(false);
         }
@@ -492,17 +482,6 @@ export default function ProfileScreen() {
                                     value={cipcRegNumber}
                                     onChangeText={handleCipcNumberChange}
                                 />
-                                <TouchableOpacity
-                                    style={[styles.editButton, { paddingVertical: 12, paddingHorizontal: 15 }]}
-                                    onPress={handleCipcVerification}
-                                    disabled={cipcVerificationLoading}
-                                >
-                                    {cipcVerificationLoading ? (
-                                        <ActivityIndicator color={THEME.navy} />
-                                    ) : (
-                                        <Text style={styles.editButtonText}>VERIFY NOW</Text>
-                                    )}
-                                </TouchableOpacity>
                             </View>
                         </View>
 
