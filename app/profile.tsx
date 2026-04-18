@@ -118,6 +118,7 @@ export default function ProfileScreen() {
         email: '',
         fullCategoryDescription: '',
         website: '',
+        credentialNumber: '',
         additionalCerts: [] as (string | { name: string; url?: string; file?: DocumentPicker.DocumentPickerAsset })[],
     });
 
@@ -157,12 +158,15 @@ export default function ProfileScreen() {
 
                     setProfile({ ...data, provinces: loadedProvinces, regions: loadedRegions });
 
+                    const loadedMapping = resolveCredentialMapping(data.category);
+
                     setFormData({
                         name: data.name || '',
                         phone: data.phone || '',
                         email: data.email || '',
                         fullCategoryDescription: data.fullCategoryDescription || data.description || '',
                         website: data.website || '',
+                        credentialNumber: loadedMapping ? data[loadedMapping.field] || '' : '',
                         additionalCerts: data.additionalCerts || [],
                     });
                     setLogoUri(data.logo || null);
@@ -184,7 +188,7 @@ export default function ProfileScreen() {
         const uploadTask = uploadBytesResumable(storageRef, blob, metadata);
 
         return new Promise<string>((resolve, reject) => {
-            uploadTask.on('state_changed', 
+            uploadTask.on('state_changed',
                 (snapshot) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                     setUploadProgress(prev => ({ ...prev, [progressKey]: progress }));
@@ -233,10 +237,10 @@ export default function ProfileScreen() {
                         const blob = await response.blob();
                         const ext = c.file.name.split('.').pop() || 'pdf';
                         const storageRef = ref(storage, `additional_certs/${user.uid}/cert_${Date.now()}_${Math.random()}.${ext}`);
-                        
+
                         const url = await uploadWithProgress(
-                            storageRef, blob, 
-                            { contentType: c.file.mimeType || 'application/pdf' }, 
+                            storageRef, blob,
+                            { contentType: c.file.mimeType || 'application/pdf' },
                             `cert_${i}`
                         );
                         finalAdditionalCerts.push({ name: c.name, url });
@@ -257,31 +261,36 @@ export default function ProfileScreen() {
                 cipcRegistrationNumber: cipcRegNumber.trim(),
             };
 
+            // Handle Professional Number
+            const mapping = resolveCredentialMapping(profile.category);
+            if (mapping) {
+                updateData[mapping.field] = formData.credentialNumber;
+            }
+
             // Handle CIPC Document Upload
             if (cipcFile) {
                 const response = await fetch(cipcFile.uri);
                 const blob = await response.blob();
                 const ext = cipcFile.name.split('.').pop() || 'pdf';
                 const storageRef = ref(storage, `cipc_docs/${user.uid}/registration_${Date.now()}.${ext}`);
-                
+
                 updateData.cipcDocumentUrl = await uploadWithProgress(
-                    storageRef, blob, 
-                    { contentType: cipcFile.mimeType || 'application/pdf' }, 
+                    storageRef, blob,
+                    { contentType: cipcFile.mimeType || 'application/pdf' },
                     'cipc'
                 );
             }
 
             // Handle Professional Credential Upload
-            const mapping = resolveCredentialMapping(profile.category);
             if (credentialFile && mapping) {
                 const response = await fetch(credentialFile.uri);
                 const blob = await response.blob();
                 const ext = credentialFile.name.split('.').pop() || 'pdf';
                 const storageRef = ref(storage, `credentials/${user.uid}/proof_${Date.now()}.${ext}`);
-                
+
                 updateData[mapping.docField] = await uploadWithProgress(
-                    storageRef, blob, 
-                    { contentType: credentialFile.mimeType || 'application/pdf' }, 
+                    storageRef, blob,
+                    { contentType: credentialFile.mimeType || 'application/pdf' },
                     'credential'
                 );
             }
@@ -289,9 +298,10 @@ export default function ProfileScreen() {
             // Security: Always use user.uid from the Auth state, never from a prop or URL
             const docRef = doc(db, "professionals", user.uid);
             await updateDoc(docRef, updateData);
-            
+
             // Refresh local profile state
             setProfile((prev: any) => ({ ...prev, ...updateData }));
+            setLogoUri(logoUrl);
             setCipcFile(null);
             setCredentialFile(null);
 
@@ -309,9 +319,9 @@ export default function ProfileScreen() {
         if (newCertInput.trim()) {
             setFormData(prev => ({
                 ...prev,
-                additionalCerts: [...prev.additionalCerts, { 
-                    name: newCertInput.trim(), 
-                    file: newCertFile || undefined 
+                additionalCerts: [...prev.additionalCerts, {
+                    name: newCertInput.trim(),
+                    file: newCertFile || undefined
                 }]
             }));
             setNewCertInput('');
@@ -534,21 +544,22 @@ export default function ProfileScreen() {
                                             <Text style={styles.certText} numberOfLines={1}>
                                                 {localFile ? `✓ ${name} (Pending Save)` : name}
                                             </Text>
-                                            {url && (
-                                            <TouchableOpacity 
-                                                onPress={() => WebBrowser.openBrowserAsync(cert.url)}
-                                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                            >
-                                                <Ionicons name="eye-outline" size={18} color={THEME.gold} />
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
+                                            {isObject && url && (
+                                                <TouchableOpacity
+                                                    onPress={() => WebBrowser.openBrowserAsync(url)}
+                                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                                >
+                                                    <Ionicons name="eye-outline" size={18} color={THEME.gold} />
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
                                         <ProgressBar progress={progress} />
-                                    <TouchableOpacity onPress={() => handleRemoveCert(index)}>
-                                        <Ionicons name="close-circle" size={20} color="#EF4444" />
-                                    </TouchableOpacity>
-                                </View>
-                            ))}
+                                        <TouchableOpacity onPress={() => handleRemoveCert(index)}>
+                                            <Ionicons name="close-circle" size={20} color="#EF4444" />
+                                        </TouchableOpacity>
+                                    </View>
+                                );
+                            })}
 
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
                                 <TextInput
@@ -577,7 +588,7 @@ export default function ProfileScreen() {
 
                         <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 20 }}>
                             <Text style={[styles.label, { color: THEME.gold, fontSize: 14, marginBottom: 15 }]}>Business Documents</Text>
-                            
+
                             <View style={styles.inputGroup}>
                                 <Text style={styles.label}>CIPC Registration Number</Text>
                                 <TextInput
@@ -589,8 +600,8 @@ export default function ProfileScreen() {
                                 />
                                 <ProgressBar progress={uploadProgress['cipc']} />
                                 <View style={{ flexDirection: 'row', gap: 10 }}>
-                                    <TouchableOpacity 
-                                        style={[styles.readOnlyInput, { flex: 1 }, cipcFile && { borderColor: THEME.gold, borderWidth: 1 }]} 
+                                    <TouchableOpacity
+                                        style={[styles.readOnlyInput, { flex: 1 }, cipcFile && { borderColor: THEME.gold, borderWidth: 1 }]}
                                         onPress={async () => {
                                             const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
                                             if (!result.canceled) setCipcFile(result.assets[0]);
@@ -603,7 +614,7 @@ export default function ProfileScreen() {
                                     </TouchableOpacity>
 
                                     {profile?.cipcDocumentUrl && !cipcFile && (
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             style={styles.previewButton}
                                             onPress={() => WebBrowser.openBrowserAsync(profile.cipcDocumentUrl)}
                                         >
@@ -620,45 +631,46 @@ export default function ProfileScreen() {
 
                         <View style={styles.inputGroup}>
                             {(() => {
-                            const mapping = profile ? resolveCredentialMapping(profile.category) : null;
-                            if (mapping) {
-                                return (
-                                    <View style={{ gap: 8 }}>
-                                        <Text style={styles.label}>{mapping.label}</Text>
-                                        <TextInput 
-                                            style={styles.input} 
-                                            value={formData.phone} // Note: This should be linked to the specific mapping field in state
-                                            placeholder={`${mapping.label} Number`} 
-                                        />
-                                        <ProgressBar progress={uploadProgress['credential']} />
-                                        <View style={{ flexDirection: 'row', gap: 10 }}>
-                                            <TouchableOpacity 
-                                                style={[styles.readOnlyInput, { flex: 1 }, credentialFile && { borderColor: THEME.gold, borderWidth: 1 }]} 
-                                                onPress={async () => {
-                                                    const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
-                                                    if (!result.canceled) setCredentialFile(result.assets[0]);
-                                                }}
-                                            >
-                                                <Text style={[styles.readOnlyText, credentialFile && { color: THEME.white }]} numberOfLines={1}>
-                                                    {credentialFile ? `✓ Attached: ${credentialFile.name}` : (profile?.[mapping.docField] ? `Update ${mapping.label}` : `Upload ${mapping.label}`)}
-                                                </Text>
-                                                <Ionicons name="ribbon" size={20} color={credentialFile ? THEME.gold : "#9CA3AF"} />
-                                            </TouchableOpacity>
-
-                                            {profile?.[mapping.docField] && !credentialFile && (
-                                                <TouchableOpacity 
-                                                    style={styles.previewButton}
-                                                    onPress={() => WebBrowser.openBrowserAsync(profile[mapping.docField])}
+                                const mapping = profile ? resolveCredentialMapping(profile.category) : null;
+                                if (mapping) {
+                                    return (
+                                        <View style={{ gap: 8 }}>
+                                            <Text style={styles.label}>{mapping.label}</Text>
+                                            <TextInput
+                                                style={styles.input}
+                                                value={formData.credentialNumber}
+                                                onChangeText={(t) => setFormData({ ...formData, credentialNumber: t })}
+                                                placeholder={`${mapping.label} Number`}
+                                            />
+                                            <ProgressBar progress={uploadProgress['credential']} />
+                                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                                                <TouchableOpacity
+                                                    style={[styles.readOnlyInput, { flex: 1 }, credentialFile && { borderColor: THEME.gold, borderWidth: 1 }]}
+                                                    onPress={async () => {
+                                                        const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
+                                                        if (!result.canceled) setCredentialFile(result.assets[0]);
+                                                    }}
                                                 >
-                                                    <Ionicons name="eye-outline" size={24} color={THEME.gold} />
+                                                    <Text style={[styles.readOnlyText, credentialFile && { color: THEME.white }]} numberOfLines={1}>
+                                                        {credentialFile ? `✓ Attached: ${credentialFile.name}` : (profile?.[mapping.docField] ? `Update ${mapping.label}` : `Upload ${mapping.label}`)}
+                                                    </Text>
+                                                    <Ionicons name="ribbon" size={20} color={credentialFile ? THEME.gold : "#9CA3AF"} />
                                                 </TouchableOpacity>
-                                            )}
+
+                                                {profile?.[mapping.docField] && !credentialFile && (
+                                                    <TouchableOpacity
+                                                        style={styles.previewButton}
+                                                        onPress={() => WebBrowser.openBrowserAsync(profile[mapping.docField])}
+                                                    >
+                                                        <Ionicons name="eye-outline" size={24} color={THEME.gold} />
+                                                    </TouchableOpacity>
+                                                )}
+                                            </View>
                                         </View>
-                                    </View>
-                                );
-                            }
-                            return null;
-                        })()}
+                                    );
+                                }
+                                return null;
+                            })()}
                         </View>
 
                         <View style={styles.inputGroup}>

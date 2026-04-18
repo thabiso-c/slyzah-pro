@@ -886,7 +886,7 @@ export default function VendorDashboard() {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top']}>
             {/* HEADER */}
             <View style={styles.header}>
                 <View>
@@ -915,11 +915,11 @@ export default function VendorDashboard() {
                             <View>
                                 {tab.paid && !isPaidTier
                                     ? <Ionicons name="lock-closed-outline" size={20} color={'#9CA3AF'} />
-                                    : <Ionicons name={tab.icon as any} size={20} color={activeTab === tab.id ? THEME.navy : '#9CA3AF'} />
+                                    : <Ionicons name={tab.icon as any} size={20} color={activeTab === tab.id ? THEME.navy : THEME.white} />
                                 }
                                 {tab.badge ? <View style={styles.tabBadge} /> : null}
                             </View>
-                            <Text style={[styles.tabLabel, activeTab === tab.id && styles.activeTabLabel, tab.paid && !isPaidTier && styles.lockedTabLabel]}>{tab.label}</Text>
+                            <Text style={[styles.tabLabel, activeTab === tab.id && styles.activeTabLabel, tab.paid && !isPaidTier && styles.lockedTabLabel, activeTab !== tab.id && { color: THEME.white }]}>{tab.label}</Text>
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
@@ -1086,7 +1086,7 @@ const styles = StyleSheet.create({
     statValue: { fontSize: 18, fontWeight: '900', color: THEME.navy, marginTop: 5 },
 
     // Tabs
-    tabsContainer: { backgroundColor: THEME.white, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' },
+    tabsContainer: { backgroundColor: THEME.navy, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
     tabsContent: { paddingHorizontal: 15, gap: 15 },
     tabItem: { alignItems: 'center', paddingVertical: 5, paddingHorizontal: 10, borderRadius: 10, minWidth: 60 },
     activeTabItem: { backgroundColor: THEME.gold },

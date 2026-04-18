@@ -115,8 +115,10 @@ export default function RootLayout() {
   useEffect(() => {
     if (!user) {
       setBusinessName(null);
+      setSubscriptionTier(null);
       return;
     }
+
     const unsubscribe = onSnapshot(doc(db, "professionals", user.uid), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -124,6 +126,7 @@ export default function RootLayout() {
         setSubscriptionTier(data.tier || null);
       }
     });
+
     return () => unsubscribe();
   }, [user]);
 
@@ -179,7 +182,7 @@ export default function RootLayout() {
           }}
         />
         <Drawer.Screen
-          name="dashboard"
+          name="(dashboard)/index"
           options={{
             drawerLabel: ({ color }) => (
               <View style={{ marginLeft: -15 }}>
@@ -193,7 +196,7 @@ export default function RootLayout() {
                 )}
               </View>
             ),
-            headerShown: false,
+            headerShown: false, // This will now correctly hide the 'DASHBOARD/INDEX' header
             drawerIcon: ({ color }) => <Ionicons name="grid-outline" size={22} color={color} />
           }}
         />

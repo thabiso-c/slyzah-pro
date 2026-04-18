@@ -16,12 +16,21 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+### Running on Emulators
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+To open the app directly on a local emulator, use the following shortcuts:
+
+- **Android:** Press `a` in the terminal or run `npx expo start --android`
+- **iOS:** Press `i` in the terminal or run `npx expo start --ios`
+
+For features requiring native code (Notifications, FileSystem deep-hooks), use Development Builds:
+
+```bash
+npx expo run:android
+npx expo run:ios
+```
+
+### Project Structure
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
