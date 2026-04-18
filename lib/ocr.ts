@@ -30,7 +30,7 @@ const extractTextWithOcrSpace = async (file: any): Promise<string> => {
 
         // Read the file as Base64
         const base64 = await FileSystem.readAsStringAsync(file.uri, {
-            encoding: FileSystem.EncodingType.Base64,
+            encoding: 'base64',
         });
 
         // Detect mime type or default to jpeg (OCR.space supports PDF/Image via base64)
@@ -123,21 +123,31 @@ const extractTextFromDocument = async (file: any, stopRegex?: RegExp): Promise<s
 
 export const verifyCIPCDocument = async (file: any) => {
     try {
-        // Regex for Registration Number: Matches 19xx or 20xx years (e.g., 1904/002186/06)
-        const regExp = /\b((?:19|20)\d{2}\/\d{6}\/\d{2})\b/;
+        // World-class robust regex: Captures parts separately to ignore OCR separator errors
+        // Matches years 1900-2099 followed by 6 digits and then 2 digits.
+        const regExp = /\b((?:19|20)\d{2})[\s\/\-\|\\\.]*(\d{6})[\s\/\-\|\\\.]*(\d{2})\b/;
 
         const text = await extractTextFromDocument(file, regExp);
         const registrationNumber = text.match(regExp);
 
         // Enhanced Enterprise Name Regex:
         // Captures text immediately following the label, supporting values on the same line or the next line.
-        const enterpriseNameMatch = text.match(/(?:Enterprise Name|Name of Enterprise)[\s.:]*\n?\s*([A-Z0-9 .&()-]+)/i);
+        // Added "Registration Name" as a fallback label found in some document variants.
+        const enterpriseNameMatch = text.match(/(?:Enterprise Name|Name of Enterprise|Registration Name)[\s.:]*\n?\s*([A-Z0-9 .&()-]+)/i);
 
         let vendorName = enterpriseNameMatch ? enterpriseNameMatch[1].trim() : null;
         if (vendorName && vendorName.length < 3) vendorName = null;
 
+        // Reconstruction logic: Rebuild the number from captured parts to ensure correct formatting
+        // even if the OCR read "2023 | 123456 | 07" or "202312345607"
+        let cleanedReg = null;
+        if (registrationNumber) {
+            const [_, year, serial, suffix] = registrationNumber;
+            cleanedReg = `${year}/${serial}/${suffix}`;
+        }
+
         return {
-            registrationNumber: registrationNumber ? registrationNumber[0] : null,
+            registrationNumber: cleanedReg,
             vendorName: vendorName,
             rawText: text
         };

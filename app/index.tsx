@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import { onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from '../lib/firebaseConfig';
 
 const THEME = {
@@ -74,65 +75,73 @@ export default function VendorLogin() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <View style={styles.logoContainer}>
-        <Image
-          source={require('../assets/splash-icon.png')}
-          style={{ width: 120, height: 120, marginBottom: 10 }}
-          resizeMode="contain"
-        />
-        <Text style={styles.appName}>SLYZAH PRO</Text>
-        <Text style={styles.tagline}>FOR PROFESSIONALS</Text>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('../assets/splash-icon.png')}
+              style={{ width: 120, height: 120, marginBottom: 10 }}
+              resizeMode="contain"
+            />
+            <Text style={styles.appName}>SLYZAH PRO</Text>
+            <Text style={styles.tagline}>FOR PROFESSIONALS</Text>
+          </View>
 
-      <View style={styles.formContainer}>
-        <Text style={styles.label}>Email Address</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="vendor@example.com"
-          placeholderTextColor="#999"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-        />
+          <View style={styles.formContainer}>
+            <Text style={styles.label}>Email Address</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="vendor@example.com"
+              placeholderTextColor="#999"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+            />
 
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="••••••••"
-          placeholderTextColor="#999"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="••••••••"
+              placeholderTextColor="#999"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
 
-        <TouchableOpacity onPress={() => router.push('/forgot-password')} style={{ alignSelf: 'flex-end', marginBottom: 20 }}>
-          <Text style={{ color: THEME.gold, fontSize: 12, fontWeight: 'bold' }}>Forgot Password?</Text>
-        </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/forgot-password')} style={{ alignSelf: 'flex-end', marginBottom: 20 }}>
+              <Text style={{ color: THEME.gold, fontSize: 12, fontWeight: 'bold' }}>Forgot Password?</Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
-          {loading ? (
-            <ActivityIndicator color={THEME.navy} />
-          ) : (
-            <Text style={styles.loginButtonText}>LOGIN TO DASHBOARD</Text>
-          )}
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color={THEME.navy} />
+              ) : (
+                <Text style={styles.loginButtonText}>LOGIN TO DASHBOARD</Text>
+              )}
+            </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push('/select-plan')} style={styles.registerLink}>
-          <Text style={styles.registerText}>
-            New Vendor? <Text style={{ color: THEME.gold, fontWeight: 'bold' }}>Register Business</Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+            <TouchableOpacity onPress={() => router.push('/select-plan')} style={styles.registerLink}>
+              <Text style={styles.registerText}>
+                New Vendor? <Text style={{ color: THEME.gold, fontWeight: 'bold' }}>Register Business</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: THEME.navy, padding: 20, justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: THEME.navy },
+  scrollContainer: { flexGrow: 1, justifyContent: 'center', padding: 20 },
   logoContainer: { alignItems: 'center', marginBottom: 50 },
   logoPlaceholder: { width: 80, height: 80, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
   appName: { fontSize: 32, fontWeight: '900', color: THEME.white, letterSpacing: 1 },

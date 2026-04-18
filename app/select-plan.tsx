@@ -4,6 +4,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from '../lib/firebaseConfig';
 
 const THEME = {
@@ -412,7 +413,7 @@ export default function SelectPlan() {
     };
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
                     <Image source={require('../assets/splash-icon.png')} style={styles.logo} resizeMode="contain" />
@@ -549,6 +550,6 @@ export default function SelectPlan() {
                     </View>
                 </View>
             </Modal>
-        </View>
+        </SafeAreaView>
     );
 }

@@ -153,6 +153,17 @@ const TIER_LIMITS: Record<string, { provinces: number; regions: number }> = {
     'multi_province': { provinces: 9, regions: 999 }
 };
 
+const Section = ({ title, number, children }: { title: string, number: number, children: React.ReactNode }) => (
+    <View style={styles.section}>
+        <View style={styles.sectionHeaderContainer}>
+            <Text style={styles.sectionHeader}>{number}. {title}</Text>
+        </View>
+        <View style={styles.sectionContent}>
+            {children}
+        </View>
+    </View>
+);
+
 const CATEGORIES = [
     { label: "Electrician", value: "Electrician" },
     { label: "Plumber", value: "Plumber" },
@@ -517,17 +528,6 @@ export default function VendorRegister() {
             setVerifyingCertId(null);
         }
     };
-
-    const Section = ({ title, number, children }: { title: string, number: number, children: React.ReactNode }) => (
-        <View style={styles.section}>
-            <View style={styles.sectionHeaderContainer}>
-                <Text style={styles.sectionHeader}>{number}. {title}</Text>
-            </View>
-            <View style={styles.sectionContent}>
-                {children}
-            </View>
-        </View>
-    );
 
     return (
         <SafeAreaView style={styles.container}>
