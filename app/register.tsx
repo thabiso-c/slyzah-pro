@@ -268,7 +268,7 @@ export default function VendorRegister() {
             if (logoUri) {
                 const response = await fetch(logoUri);
                 const blob = await response.blob();
-                const storageRef = ref(storage, `logos/${uid}_${Date.now()}`);
+                const storageRef = ref(storage, `logos/${uid}/${Date.now()}`);
                 const snapshot = await uploadBytes(storageRef, blob);
                 logoUrl = await getDownloadURL(snapshot.ref);
             }
@@ -278,7 +278,7 @@ export default function VendorRegister() {
             if (cipcFile) {
                 const response = await fetch(cipcFile.uri);
                 const blob = await response.blob();
-                const storageRef = ref(storage, `cipc_docs/${uid}_${cipcFile.name}`);
+                const storageRef = ref(storage, `cipc_docs/${uid}/${cipcFile.name}`);
                 const snapshot = await uploadBytes(storageRef, blob);
                 cipcDocumentUrl = await getDownloadURL(snapshot.ref);
             }
@@ -583,7 +583,7 @@ export default function VendorRegister() {
                                 }} disabled={isUploadingCIPC} activeOpacity={0.7}>
                                     {isUploadingCIPC
                                         ? <ActivityIndicator color={THEME.navy} />
-                                        : <Text style={[styles.fileButtonText, cipcVerified && { color: '#15803d' }]}>{cipcVerified ? `✓ Verified: ${cipcFile?.name}` : "Upload CIPC Document"}</Text>
+                                        : <Text style={[styles.fileButtonText, cipcVerified && { color: '#15803d' }]}>{cipcVerified ? `✓ Attached: ${cipcFile?.name}` : "Upload CIPC Document"}</Text>
                                     }
                                 </TouchableOpacity>
                             </View>
@@ -636,7 +636,7 @@ export default function VendorRegister() {
                                 }} disabled={isVerifyingCredential} activeOpacity={0.7}>
                                     {isVerifyingCredential
                                         ? <ActivityIndicator color={THEME.navy} />
-                                        : <Text style={[styles.fileButtonText, credentialFile && { color: '#15803d' }]}>{credentialFile ? `✓ Verified: ${credentialFile.name}` : "Upload Document"}</Text>
+                                        : <Text style={[styles.fileButtonText, credentialFile && { color: '#15803d' }]}>{credentialFile ? `✓ Attached: ${credentialFile.name}` : "Upload Document"}</Text>
                                     }
                                 </TouchableOpacity>
                             </View>
