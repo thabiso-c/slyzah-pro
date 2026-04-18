@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { getDownloadURL, ref, uploadBytesResumable } from 'firebase/storage';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,33 +16,33 @@ const THEME = {
     white: '#FFFFFF',
     gray: '#F3F4F6',
 };
-const CREDENTIAL_MAPPING: Record<string, { label: string; field: string }> = {
-    "Plumber": { label: "PIRB Licensed", field: "pirbNumber" },
-    "Electrician": { label: "Wireman's License", field: "wiremanNumber" },
-    "Panel Beater": { label: "RMI Member", field: "rmiNumber" },
-    "Builder": { label: "NHBRC Reg", field: "nhbrcNumber" },
-    "Gas": { label: "SAQCC Gas", field: "saqccNumber" },
-    "Air Conditioning": { label: "SARACCA", field: "saraccaNumber" },
-    "CCTV & Security": { label: "PSiRA Reg", field: "psiraNumber" },
-    "Pest Control": { label: "PCO Reg", field: "pcoNumber" },
-    "Appliance Repairs": { label: "Trade Cert", field: "tradeCertNumber" },
-    "Locksmith": { label: "LASA Member", field: "lasaNumber" },
-    "Roofing": { label: "PRA Member", field: "praNumber" },
-    "Gate Motors": { label: "Certified Installer", field: "installerNumber" },
-    "Handyman": { label: "Liability Insurance", field: "liabilityPolicyNumber" },
-    "Solar/Power": { label: "PV Green Card", field: "pvGreenCardNumber" },
-    "Cleaning": { label: "NCCA Member", field: "nccaNumber" },
-    "Automotive": { label: "RMI / MIWA", field: "rmiMiwaNumber" },
-    "Carpenter": { label: "Trade Cert", field: "tradeCertNumber" },
-    "Solar": { label: "PV GreenCard", field: "pvGreenCardNumber" },
-    "Fire Protection": { label: "SAQCC Fire", field: "fireRegNumber" },
-    "Movers": { label: "PMA Member", field: "pmaNumber" },
-    "Mechanic": { label: "MIWA/RMI Member", field: "miwaNumber" },
-    "Auto Glass": { label: "SAGGA Member", field: "saggaNumber" },
-    "Borehole": { label: "BWA Member", field: "bwaNumber" },
-    "Pool Services": { label: "NSPI Member", field: "nspiNumber" },
-    "Tree Felling": { label: "Public Liability", field: "insuranceNumber" },
-    "Solar / EV": { label: "PV GreenCard / EV Cert", field: "pvGreenCardNumber" },
+const CREDENTIAL_MAPPING: Record<string, { label: string; field: string; docField: string }> = {
+    "Plumber": { label: "PIRB / CoCT Reg", field: "pirbNumber", docField: "pirbDocumentUrl" },
+    "Electrician": { label: "Wireman's License", field: "wiremanNumber", docField: "wiremanDocumentUrl" },
+    "Panel Beater": { label: "RMI Member", field: "rmiNumber", docField: "rmiDocumentUrl" },
+    "Builder": { label: "NHBRC Reg", field: "nhbrcNumber", docField: "nhbrcDocumentUrl" },
+    "Gas": { label: "SAQCC Gas", field: "saqccNumber", docField: "saqccDocumentUrl" },
+    "Air Conditioning": { label: "SARACCA", field: "saraccaNumber", docField: "saraccaDocumentUrl" },
+    "CCTV & Security": { label: "PSiRA Reg", field: "psiraNumber", docField: "psiraDocumentUrl" },
+    "Pest Control": { label: "PCO Reg", field: "pcoNumber", docField: "pcoDocumentUrl" },
+    "Appliance Repairs": { label: "Trade Cert", field: "tradeCertNumber", docField: "tradeCertDocumentUrl" },
+    "Locksmith": { label: "LASA Member", field: "lasaNumber", docField: "lasaDocumentUrl" },
+    "Roofing": { label: "PRA Member", field: "praNumber", docField: "praDocumentUrl" },
+    "Gate Motors": { label: "Certified Installer", field: "installerNumber", docField: "installerDocumentUrl" },
+    "Handyman": { label: "Liability Insurance", field: "liabilityPolicyNumber", docField: "liabilityPolicyUrl" },
+    "Solar/Power": { label: "PV Green Card", field: "pvGreenCardNumber", docField: "pvGreenCardUrl" },
+    "Cleaning": { label: "NCCA Member", field: "nccaNumber", docField: "nccaUrl" },
+    "Automotive": { label: "RMI / MIWA", field: "rmiMiwaNumber", docField: "rmiMiwaUrl" },
+    "Carpenter": { label: "Trade Certificate", field: "tradeCertNumber", docField: "tradeCertDocumentUrl" },
+    "Solar": { label: "PV GreenCard", field: "pvGreenCardNumber", docField: "pvGreenCardUrl" },
+    "Fire Protection": { label: "SAQCC Fire", field: "fireRegNumber", docField: "fireRegUrl" },
+    "Movers": { label: "PMA Member", field: "pmaNumber", docField: "pmaUrl" },
+    "Mechanic": { label: "MIWA/RMI Member", field: "miwaNumber", docField: "miwaUrl" },
+    "Auto Glass": { label: "SAGGA Member", field: "saggaNumber", docField: "saggaUrl" },
+    "Borehole": { label: "BWA Member", field: "bwaNumber", docField: "bwaUrl" },
+    "Pool Services": { label: "NSPI Member", field: "nspiNumber", docField: "nspiUrl" },
+    "Tree Felling": { label: "Public Liability", field: "insuranceNumber", docField: "insuranceUrl" },
+    "Solar / EV": { label: "PV GreenCard / EV Cert", field: "pvGreenCardNumber", docField: "pvGreenCardUrl" },
 };
 
 const LOCATION_MAPPING: Record<string, string[]> = {
@@ -116,7 +118,7 @@ export default function ProfileScreen() {
         email: '',
         fullCategoryDescription: '',
         website: '',
-        additionalCerts: [] as string[],
+        additionalCerts: [] as (string | { name: string; url?: string; file?: DocumentPicker.DocumentPickerAsset })[],
     });
 
     // Location Modal State
@@ -125,9 +127,13 @@ export default function ProfileScreen() {
     const [tempProvinces, setTempProvinces] = useState<string[]>([]);
     const [tempRegions, setTempRegions] = useState<string[]>([]);
     const [newCertInput, setNewCertInput] = useState('');
+    const [newCertFile, setNewCertFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
     const [logoUri, setLogoUri] = useState<string | null>(null);
     const [cipcVerificationLoading, setCipcVerificationLoading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
     const [cipcRegNumber, setCipcRegNumber] = useState('');
+    const [cipcFile, setCipcFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+    const [credentialFile, setCredentialFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
 
     const isPaidTier = useMemo(() => profile?.tier && profile.tier.toLowerCase() !== 'basic', [profile]);
 
@@ -160,6 +166,7 @@ export default function ProfileScreen() {
                         additionalCerts: data.additionalCerts || [],
                     });
                     setLogoUri(data.logo || null);
+                    setCipcRegNumber(data.cipcRegistrationNumber || '');
                 }
             } catch (error) {
                 console.error("Error fetching profile:", error);
@@ -171,6 +178,22 @@ export default function ProfileScreen() {
 
         fetchProfile();
     }, []);
+
+    // Helper to handle resumable uploads with progress tracking
+    const uploadWithProgress = async (storageRef: any, blob: Blob, metadata: any, progressKey: string) => {
+        const uploadTask = uploadBytesResumable(storageRef, blob, metadata);
+
+        return new Promise<string>((resolve, reject) => {
+            uploadTask.on('state_changed', 
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setUploadProgress(prev => ({ ...prev, [progressKey]: progress }));
+                },
+                (error) => reject(error),
+                async () => resolve(await getDownloadURL(uploadTask.snapshot.ref))
+            );
+        });
+    };
 
     const handleSave = async () => {
         const user = auth.currentUser;
@@ -187,28 +210,93 @@ export default function ProfileScreen() {
             // Sanitization
             const sanitizedName = formData.name.trim().replace(/[<>]/g, "");
             let logoUrl = profile.logo;
+            setUploadProgress({});
 
             // If a new logo was picked (it's a local file URI)
             if (logoUri && logoUri.startsWith('file://')) {
                 const response = await fetch(logoUri);
                 const blob = await response.blob();
-                const storageRef = ref(storage, `logos/${user.uid}_${Date.now()}`);
-                const snapshot = await uploadBytes(storageRef, blob);
-                logoUrl = await getDownloadURL(snapshot.ref);
+                const storageRef = ref(storage, `logos/${user.uid}/${Date.now()}`);
+                logoUrl = await uploadWithProgress(storageRef, blob, { contentType: 'image/jpeg' }, 'logo');
             }
 
-            // Security: Always use user.uid from the Auth state, never from a prop or URL
-            const docRef = doc(db, "professionals", user.uid);
-            await updateDoc(docRef, {
+            // Process Additional Certifications (Handle new uploads)
+            const finalAdditionalCerts = [];
+            for (let i = 0; i < formData.additionalCerts.length; i++) {
+                const cert = formData.additionalCerts[i];
+                if (typeof cert === 'string') {
+                    finalAdditionalCerts.push(cert);
+                } else if (cert && typeof cert === 'object') {
+                    const c = cert as { name: string; url?: string; file?: DocumentPicker.DocumentPickerAsset };
+                    if (c.file) {
+                        const response = await fetch(c.file.uri);
+                        const blob = await response.blob();
+                        const ext = c.file.name.split('.').pop() || 'pdf';
+                        const storageRef = ref(storage, `additional_certs/${user.uid}/cert_${Date.now()}_${Math.random()}.${ext}`);
+                        
+                        const url = await uploadWithProgress(
+                            storageRef, blob, 
+                            { contentType: c.file.mimeType || 'application/pdf' }, 
+                            `cert_${i}`
+                        );
+                        finalAdditionalCerts.push({ name: c.name, url });
+                    } else {
+                        finalAdditionalCerts.push(cert);
+                    }
+                }
+            }
+
+            const updateData: any = {
                 name: sanitizedName,
                 phone: formData.phone.trim(),
                 email: formData.email.toLowerCase().trim(),
                 fullCategoryDescription: formData.fullCategoryDescription.trim(),
                 website: formData.website.trim(),
-                additionalCerts: formData.additionalCerts,
+                additionalCerts: finalAdditionalCerts,
                 logo: logoUrl,
-            });
+                cipcRegistrationNumber: cipcRegNumber.trim(),
+            };
+
+            // Handle CIPC Document Upload
+            if (cipcFile) {
+                const response = await fetch(cipcFile.uri);
+                const blob = await response.blob();
+                const ext = cipcFile.name.split('.').pop() || 'pdf';
+                const storageRef = ref(storage, `cipc_docs/${user.uid}/registration_${Date.now()}.${ext}`);
+                
+                updateData.cipcDocumentUrl = await uploadWithProgress(
+                    storageRef, blob, 
+                    { contentType: cipcFile.mimeType || 'application/pdf' }, 
+                    'cipc'
+                );
+            }
+
+            // Handle Professional Credential Upload
+            const mapping = resolveCredentialMapping(profile.category);
+            if (credentialFile && mapping) {
+                const response = await fetch(credentialFile.uri);
+                const blob = await response.blob();
+                const ext = credentialFile.name.split('.').pop() || 'pdf';
+                const storageRef = ref(storage, `credentials/${user.uid}/proof_${Date.now()}.${ext}`);
+                
+                updateData[mapping.docField] = await uploadWithProgress(
+                    storageRef, blob, 
+                    { contentType: credentialFile.mimeType || 'application/pdf' }, 
+                    'credential'
+                );
+            }
+
+            // Security: Always use user.uid from the Auth state, never from a prop or URL
+            const docRef = doc(db, "professionals", user.uid);
+            await updateDoc(docRef, updateData);
+            
+            // Refresh local profile state
+            setProfile((prev: any) => ({ ...prev, ...updateData }));
+            setCipcFile(null);
+            setCredentialFile(null);
+
             Alert.alert("Success", "Profile updated successfully!");
+            setUploadProgress({});
         } catch (error) {
             console.error("Error updating profile:", error);
             Alert.alert("Error", "Could not update profile. Please try again.");
@@ -221,9 +309,13 @@ export default function ProfileScreen() {
         if (newCertInput.trim()) {
             setFormData(prev => ({
                 ...prev,
-                additionalCerts: [...prev.additionalCerts, newCertInput.trim()]
+                additionalCerts: [...prev.additionalCerts, { 
+                    name: newCertInput.trim(), 
+                    file: newCertFile || undefined 
+                }]
             }));
             setNewCertInput('');
+            setNewCertFile(null);
         }
     };
 
@@ -232,6 +324,15 @@ export default function ProfileScreen() {
             ...prev,
             additionalCerts: prev.additionalCerts.filter((_, index) => index !== indexToRemove)
         }));
+    };
+
+    const ProgressBar = ({ progress }: { progress?: number }) => {
+        if (progress === undefined || progress <= 0 || progress >= 100) return null;
+        return (
+            <View style={styles.progressTrack}>
+                <View style={[styles.progressBar, { width: `${progress}%` }]} />
+            </View>
+        );
     };
 
     const openLocationModal = (type: 'province' | 'region') => {
@@ -317,25 +418,6 @@ export default function ProfileScreen() {
         if (!result.canceled) {
             setLogoUri(result.assets[0].uri);
         }
-    };
-
-    const handleCipcVerification = async () => {
-        if (!cipcRegNumber) return;
-        setCipcVerificationLoading(true);
-        try {
-            const user = auth.currentUser;
-            if (user) {
-                const docRef = doc(db, "professionals", user.uid);
-                await updateDoc(docRef, { cipcRegistrationNumber: cipcRegNumber });
-                Alert.alert("Profile Update", "Business registration number has been updated.");
-            }
-        } finally {
-            setCipcVerificationLoading(false);
-        }
-    };
-
-    const handleCipcNumberChange = (text: string) => {
-        setCipcRegNumber(text);
     };
 
 
@@ -438,9 +520,30 @@ export default function ProfileScreen() {
                             <Text style={styles.label}>Additional Certifications</Text>
                             <Text style={styles.helperText}>Showcase other qualifications to stand out.</Text>
 
-                            {formData.additionalCerts.map((cert, index) => (
-                                <View key={index} style={styles.certItem}>
-                                    <Text style={styles.certText}>{cert}</Text>
+                            {formData.additionalCerts.map((cert, index) => {
+                                const isObject = typeof cert !== 'string';
+                                const certData = cert as any;
+                                const name = isObject ? certData.name : cert;
+                                const url = isObject ? certData.url : null;
+                                const localFile = isObject ? certData.file : null;
+                                const progress = uploadProgress[`cert_${index}`];
+
+                                return (
+                                    <View key={index} style={[styles.certItem, progress > 0 && { paddingBottom: 15 }]}>
+                                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                            <Text style={styles.certText} numberOfLines={1}>
+                                                {localFile ? `✓ ${name} (Pending Save)` : name}
+                                            </Text>
+                                            {url && (
+                                            <TouchableOpacity 
+                                                onPress={() => WebBrowser.openBrowserAsync(cert.url)}
+                                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                            >
+                                                <Ionicons name="eye-outline" size={18} color={THEME.gold} />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                        <ProgressBar progress={progress} />
                                     <TouchableOpacity onPress={() => handleRemoveCert(index)}>
                                         <Ionicons name="close-circle" size={20} color="#EF4444" />
                                     </TouchableOpacity>
@@ -472,34 +575,92 @@ export default function ProfileScreen() {
                             <Text style={styles.helperText}>Contact support to change category.</Text>
                         </View>
 
-                        <View style={styles.inputGroup}>
-                            <Text style={styles.label}>CIPC Registration Number</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 20 }}>
+                            <Text style={[styles.label, { color: THEME.gold, fontSize: 14, marginBottom: 15 }]}>Business Documents</Text>
+                            
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>CIPC Registration Number</Text>
                                 <TextInput
-                                    style={[styles.input, { flex: 1, marginRight: 10 }]}
-                                    placeholder="Enter CIPC Registration Number"
+                                    style={styles.input}
+                                    placeholder="e.g. 2024/123456/07"
                                     placeholderTextColor="#999"
                                     value={cipcRegNumber}
-                                    onChangeText={handleCipcNumberChange}
+                                    onChangeText={setCipcRegNumber}
                                 />
+                                <ProgressBar progress={uploadProgress['cipc']} />
+                                <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <TouchableOpacity 
+                                        style={[styles.readOnlyInput, { flex: 1 }, cipcFile && { borderColor: THEME.gold, borderWidth: 1 }]} 
+                                        onPress={async () => {
+                                            const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
+                                            if (!result.canceled) setCipcFile(result.assets[0]);
+                                        }}
+                                    >
+                                        <Text style={[styles.readOnlyText, cipcFile && { color: THEME.white }]} numberOfLines={1}>
+                                            {cipcFile ? `✓ Attached: ${cipcFile.name}` : (profile?.cipcDocumentUrl ? "Update CIPC Document" : "Upload CIPC Document")}
+                                        </Text>
+                                        <Ionicons name="document-attach" size={20} color={cipcFile ? THEME.gold : "#9CA3AF"} />
+                                    </TouchableOpacity>
+
+                                    {profile?.cipcDocumentUrl && !cipcFile && (
+                                        <TouchableOpacity 
+                                            style={styles.previewButton}
+                                            onPress={() => WebBrowser.openBrowserAsync(profile.cipcDocumentUrl)}
+                                        >
+                                            <Ionicons name="eye-outline" size={24} color={THEME.gold} />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             </View>
                         </View>
 
                         {profile?.cipcVerified && (
-                            <Text style={{ color: 'green', fontWeight: 'bold', marginTop: -10, marginBottom: 10 }}>✅ CIPC Verified: {profile.cipcEnterpriseName}</Text>
+                            <Text style={{ color: '#10B981', fontWeight: 'bold', marginTop: -5, marginLeft: 5 }}>✓ CIPC Verified: {profile.cipcEnterpriseName}</Text>
                         )}
-                        {(() => {
+
+                        <View style={styles.inputGroup}>
+                            {(() => {
                             const mapping = profile ? resolveCredentialMapping(profile.category) : null;
-                            if (profile && mapping && profile[mapping.field]) {
+                            if (mapping) {
                                 return (
-                                    <View style={styles.inputGroup}>
+                                    <View style={{ gap: 8 }}>
                                         <Text style={styles.label}>{mapping.label}</Text>
-                                        <Text style={styles.input}>{profile[mapping.field]}</Text>
+                                        <TextInput 
+                                            style={styles.input} 
+                                            value={formData.phone} // Note: This should be linked to the specific mapping field in state
+                                            placeholder={`${mapping.label} Number`} 
+                                        />
+                                        <ProgressBar progress={uploadProgress['credential']} />
+                                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                                            <TouchableOpacity 
+                                                style={[styles.readOnlyInput, { flex: 1 }, credentialFile && { borderColor: THEME.gold, borderWidth: 1 }]} 
+                                                onPress={async () => {
+                                                    const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
+                                                    if (!result.canceled) setCredentialFile(result.assets[0]);
+                                                }}
+                                            >
+                                                <Text style={[styles.readOnlyText, credentialFile && { color: THEME.white }]} numberOfLines={1}>
+                                                    {credentialFile ? `✓ Attached: ${credentialFile.name}` : (profile?.[mapping.docField] ? `Update ${mapping.label}` : `Upload ${mapping.label}`)}
+                                                </Text>
+                                                <Ionicons name="ribbon" size={20} color={credentialFile ? THEME.gold : "#9CA3AF"} />
+                                            </TouchableOpacity>
+
+                                            {profile?.[mapping.docField] && !credentialFile && (
+                                                <TouchableOpacity 
+                                                    style={styles.previewButton}
+                                                    onPress={() => WebBrowser.openBrowserAsync(profile[mapping.docField])}
+                                                >
+                                                    <Ionicons name="eye-outline" size={24} color={THEME.gold} />
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
                                     </View>
                                 );
                             }
                             return null;
                         })()}
+                        </View>
+
                         <View style={styles.inputGroup}>
                             <Text style={styles.label}>Service Area</Text>
                             <View style={[styles.readOnlyInput, { flexDirection: 'column', alignItems: 'flex-start', gap: 8 }]}>
@@ -601,6 +762,7 @@ const styles = StyleSheet.create({
     readOnlyGroup: { gap: 8, opacity: 0.7 },
     readOnlyInput: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     readOnlyText: { color: '#9CA3AF', fontSize: 16 },
+    previewButton: { backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 15, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     helperText: { color: '#9CA3AF', fontSize: 10, marginLeft: 4 },
     editButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: THEME.gold, padding: 10, borderRadius: 8, alignSelf: 'flex-start', marginTop: -5 },
     editButtonText: { color: THEME.navy, fontWeight: '900', fontSize: 10 },
@@ -615,6 +777,8 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         marginBottom: 8,
     },
+    progressTrack: { height: 4, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 2, marginTop: 8, width: '100%', position: 'absolute', bottom: 0, left: 12 },
+    progressBar: { height: '100%', backgroundColor: THEME.gold, borderRadius: 2 },
     certText: {
         color: THEME.white,
         fontSize: 14,

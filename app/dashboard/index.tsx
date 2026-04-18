@@ -890,8 +890,9 @@ export default function VendorDashboard() {
             {/* HEADER */}
             <View style={styles.header}>
                 <View>
-                    <Text style={styles.greeting}>Welcome back,</Text>
-                    <Text style={styles.vendorName}>{profile?.name || "Vendor"}</Text>
+                    <Text style={styles.vendorName}>
+                        {profile?.name ? `${profile.name.toUpperCase()} DASHBOARD` : "DASHBOARD"}
+                    </Text>
                 </View>
                 <View style={styles.tierBadge}>
                     <Text style={styles.tierText}>{profile?.tier || "Basic"}</Text>
@@ -925,7 +926,7 @@ export default function VendorDashboard() {
             </View>
 
             <KeyboardAvoidingView
-                style={{ flex: 1 }}
+                style={{ flex: 1, backgroundColor: THEME.gray }}
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
             >
                 <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
@@ -1070,7 +1071,7 @@ export default function VendorDashboard() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: THEME.gray },
+    container: { flex: 1, backgroundColor: THEME.navy },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: THEME.navy },
     loadingText: { color: THEME.gold, marginTop: 10, fontWeight: 'bold' },
     header: { padding: 20, backgroundColor: THEME.navy, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

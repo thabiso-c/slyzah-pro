@@ -269,7 +269,7 @@ export default function VendorRegister() {
                 const response = await fetch(logoUri);
                 const blob = await response.blob();
                 const storageRef = ref(storage, `logos/${uid}/${Date.now()}`);
-                const snapshot = await uploadBytes(storageRef, blob);
+                const snapshot = await uploadBytes(storageRef, blob, { contentType: 'image/jpeg' });
                 logoUrl = await getDownloadURL(snapshot.ref);
             }
 
@@ -278,8 +278,11 @@ export default function VendorRegister() {
             if (cipcFile) {
                 const response = await fetch(cipcFile.uri);
                 const blob = await response.blob();
-                const storageRef = ref(storage, `cipc_docs/${uid}/${cipcFile.name}`);
-                const snapshot = await uploadBytes(storageRef, blob);
+                const cipcExt = cipcFile.name.split('.').pop() || 'pdf';
+                const storageRef = ref(storage, `cipc_docs/${uid}/registration_${Date.now()}.${cipcExt}`);
+                const snapshot = await uploadBytes(storageRef, blob, {
+                    contentType: cipcFile.mimeType || 'application/pdf'
+                });
                 cipcDocumentUrl = await getDownloadURL(snapshot.ref);
             }
 
@@ -289,18 +292,24 @@ export default function VendorRegister() {
                 if (!cert.name.trim() || !cert.file) continue;
                 const response = await fetch(cert.file.uri);
                 const blob = await response.blob();
-                const storageRef = ref(storage, `additional_certs/${uid}/${Date.now()}_${cert.file.name}`);
-                const snapshot = await uploadBytes(storageRef, blob);
+                const certExt = cert.file.name.split('.').pop() || 'pdf';
+                const storageRef = ref(storage, `additional_certs/${uid}/cert_${Date.now()}.${certExt}`);
+                const snapshot = await uploadBytes(storageRef, blob, {
+                    contentType: cert.file.mimeType || 'application/pdf'
+                });
                 const certUrl = await getDownloadURL(snapshot.ref);
                 finalAdditionalCerts.push({ name: cert.name, url: certUrl });
             }
 
             let credentialDocUrl = null;
-            if (credentialFile && mapping) {
+            if (credentialFile && credentialMapping) {
                 const response = await fetch(credentialFile.uri);
                 const blob = await response.blob();
-                const storageRef = ref(storage, `credentials/${uid}/${mapping.field}_${Date.now()}`);
-                const snapshot = await uploadBytes(storageRef, blob);
+                const credExt = credentialFile.name.split('.').pop() || 'pdf';
+                const storageRef = ref(storage, `credentials/${uid}/proof_${Date.now()}.${credExt}`);
+                const snapshot = await uploadBytes(storageRef, blob, {
+                    contentType: credentialFile.mimeType || 'application/pdf'
+                });
                 credentialDocUrl = await getDownloadURL(snapshot.ref);
             }
 

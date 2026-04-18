@@ -1,17 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
-import Constants from 'expo-constants';
 import { usePathname, useRouter } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { auth, db } from '../lib/firebaseConfig';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { auth, db } from '../lib/firebaseConfig';
 
 const THEME = {
   navy: '#001f3f',
@@ -69,6 +68,8 @@ function CustomDrawerContent(props: any) {
 export default function RootLayout() {
   const [user, setUser] = useState<User | null>(null);
   const [isTermsAccepted, setIsTermsAccepted] = useState(true);
+  const [businessName, setBusinessName] = useState<string | null>(null);
+  const [subscriptionTier, setSubscriptionTier] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -108,6 +109,21 @@ export default function RootLayout() {
       setLoading(false);
     });
 
+    return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setBusinessName(null);
+      return;
+    }
+    const unsubscribe = onSnapshot(doc(db, "professionals", user.uid), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setBusinessName(data.name || null);
+        setSubscriptionTier(data.tier || null);
+      }
+    });
     return () => unsubscribe();
   }, [user]);
 
@@ -165,8 +181,19 @@ export default function RootLayout() {
         <Drawer.Screen
           name="dashboard"
           options={{
-            drawerLabel: 'Dashboard',
-            title: 'VENDOR DASHBOARD',
+            drawerLabel: ({ color }) => (
+              <View style={{ marginLeft: -15 }}>
+                <Text style={{ color, fontWeight: 'bold', fontSize: 13 }}>
+                  {businessName ? `${businessName.toUpperCase()} DASHBOARD` : 'DASHBOARD'}
+                </Text>
+                {subscriptionTier && (
+                  <Text style={{ color: THEME.gold, fontSize: 9, fontWeight: '900', marginTop: 2 }}>
+                    {subscriptionTier.toUpperCase()} PLAN
+                  </Text>
+                )}
+              </View>
+            ),
+            headerShown: false,
             drawerIcon: ({ color }) => <Ionicons name="grid-outline" size={22} color={color} />
           }}
         />
@@ -204,10 +231,6 @@ export default function RootLayout() {
         />
         <Drawer.Screen
           name="RequestQuoteForm"
-          options={{ drawerItemStyle: { display: 'none' }, headerShown: false }}
-        />
-        <Drawer.Screen
-          name="[id]"
           options={{ drawerItemStyle: { display: 'none' }, headerShown: false }}
         />
         <Drawer.Screen
