@@ -17,6 +17,7 @@
       "bundleIdentifier": "com.slyzah.pro",
       "infoPlist": {
         "UIBackgroundModes": [
+          "remote-notification",
           "remote-notification"
         ]
       }
@@ -28,6 +29,8 @@
       },
       "package": "com.slyzah.pro",
       "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
         "RECEIVE_BOOT_COMPLETED",
         "WAKE_LOCK"
       ]
@@ -62,6 +65,12 @@
         "projectId": "36793b52-3b0f-4382-aa29-c3a867184961"
       }
     },
-    "owner": "thabilet"
+    "owner": "thabilet",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/36793b52-3b0f-4382-aa29-c3a867184961"
+    }
   }
 }
