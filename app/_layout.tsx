@@ -2,11 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import { usePathname, useRouter } from 'expo-router';
 import { Drawer } from 'expo-router/drawer';
+import { Alert, ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePushNotifications } from '../hooks/usePushNotifications';
@@ -97,8 +96,15 @@ export default function RootLayout() {
     const unsubscribe = onSnapshot(doc(db, "users", user.uid), async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        // Only update if the field exists to avoid race conditions with local writes (e.g. push tokens)
-        // creating partial documents before the full user profile syncs.
+
+        // FIX: vendor app must reject non-vendor (customer) accounts
+        if (data?.role && data.role !== "vendor") {
+          await signOut(auth);
+          Alert.alert("Access Denied", "Customer accounts cannot log into the Vendor app. Please register a new vendor account.");
+          router.replace("/");
+          return;
+        }
+
         if (data && 'hasAcceptedTerms' in data) {
           setIsTermsAccepted(data.hasAcceptedTerms === true);
         }

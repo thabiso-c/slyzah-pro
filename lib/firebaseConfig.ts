@@ -2,7 +2,7 @@ import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import { getApp, getApps, initializeApp } from "firebase/app";
 // @ts-ignore - getReactNativePersistence exists in RN environment but might be missing in web-only types
 import { getReactNativePersistence, initializeAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -22,7 +22,8 @@ const auth = initializeAuth(app, {
     persistence: getReactNativePersistence(ReactNativeAsyncStorage)
 });
 
-const db = getFirestore(app);
+// FIX: match slyzah-app — VPN/Zscaler long-polling fix
+const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 const storage = getStorage(app);
 
 export { app, auth, db, storage };
