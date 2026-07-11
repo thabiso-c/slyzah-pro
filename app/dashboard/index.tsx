@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from '../../lib/firebaseConfig';
+import { sendPushNotification } from '../../lib/api_client';
 
 const THEME = {
     navy: '#001f3f',
@@ -80,6 +81,7 @@ export default function VendorDashboard() {
     }, [leads]);
 
     useEffect(() => {
+        const unsubscribers: Array<() => void> = [];
         const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser: User | null) => {
             if (currentUser) {
                 setUser(currentUser);
@@ -110,7 +112,7 @@ export default function VendorDashboard() {
                         where("category", "==", profileData.category),
                         orderBy("createdAt", "desc")
                     );
-                    onSnapshot(leadsQuery, (snapshot) => {
+                    unsubscribers.push(onSnapshot(leadsQuery, (snapshot) => {
                         snapshot.docChanges().forEach((change) => {
                             const data = change.doc.data();
 
@@ -156,7 +158,7 @@ export default function VendorDashboard() {
                         });
                         setLeads(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
                         setLoading(false);
-                    });
+                    }));
 
                     // 3. Listen for Chats
                     const chatsQuery = query(
@@ -164,7 +166,7 @@ export default function VendorDashboard() {
                         where("vendorId", "==", profileData.id),
                         orderBy("updatedAt", "desc")
                     );
-                    onSnapshot(chatsQuery, (snapshot) => {
+                    unsubscribers.push(onSnapshot(chatsQuery, (snapshot) => {
                         snapshot.docChanges().forEach((change) => {
                             if (change.type === "modified") {
                                 const data = change.doc.data();
@@ -187,13 +189,13 @@ export default function VendorDashboard() {
                         setChats(chatList);
                         const unread = chatList.reduce((acc: number, chat: any) => acc + (chat.vendorUnreadCount || 0), 0);
                         setUnreadMsgCount(unread);
-                    });
+                    }));
 
                     // 4. Listen for Quotes
                     const quotesQuery = query(collection(db, "quotes"), where("vendorId", "==", profileData.id));
-                    onSnapshot(quotesQuery, (snapshot) => {
+                    unsubscribers.push(onSnapshot(quotesQuery, (snapshot) => {
                         setQuotes(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-                    });
+                    }));
 
                     // 5. Listen for Notifications
                     const notifQuery = query(
@@ -201,7 +203,7 @@ export default function VendorDashboard() {
                         orderBy("createdAt", "desc"),
                         limit(20)
                     );
-                    onSnapshot(notifQuery, (snapshot) => {
+                    unsubscribers.push(onSnapshot(notifQuery, (snapshot) => {
                         snapshot.docChanges().forEach((change) => {
                             if (change.type === "added") {
                                 const data = change.doc.data();
@@ -225,7 +227,7 @@ export default function VendorDashboard() {
                         setNotifications(notifList);
                         const unread = notifList.filter((n: any) => n.status === 'unread').length;
                         setUnreadNotifCount(unread);
-                    });
+                    }));
 
                     // 6. Listen for Reviews
                     const reviewsQuery = query(
@@ -233,9 +235,9 @@ export default function VendorDashboard() {
                         where("vendorId", "==", profileData.id),
                         orderBy("createdAt", "desc")
                     );
-                    onSnapshot(reviewsQuery, (snapshot) => {
+                    unsubscribers.push(onSnapshot(reviewsQuery, (snapshot) => {
                         setReviews(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-                    });
+                    }));
 
                 } else {
                     Alert.alert("Error", "Vendor profile not found.");
@@ -245,7 +247,10 @@ export default function VendorDashboard() {
                 router.replace('/');
             }
         });
-        return unsubscribeAuth;
+        return () => {
+            unsubscribers.forEach(unsub => unsub());
+            unsubscribeAuth();
+        };
     }, []);
 
     const handleSendSupport = async () => {
@@ -337,39 +342,19 @@ export default function VendorDashboard() {
                 }
             });
 
-            // 3. Send Push Notification to Customer (Mobile Equivalent of Server Action)
+            // 3. Send Push Notification to Customer via centralized API
             if (selectedLead.customerId) {
                 try {
                     const customerDoc = await getDoc(doc(db, "users", selectedLead.customerId));
                     if (customerDoc.exists()) {
                         const customerData = customerDoc.data();
                         if (customerData.expoPushToken) {
-                            console.log(`Sending quote push to token: ${customerData.expoPushToken}`);
-                            const response = await fetch('https://exp.host/--/api/v2/push/send', {
-                                method: 'POST',
-                                headers: {
-                                    'Accept': 'application/json',
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    to: customerData.expoPushToken,
-                                    sound: 'slyzah_alert.mp3',
-                                    title: 'New Quote Received! 💰',
-                                    body: `${vendorName} sent you a quote for R${quotePrice}`,
-                                    data: { leadId: selectedLead.id },
-                                    channelId: 'slyzah_alert',
-                                    priority: 'high',
-                                    badge: 1,
-                                    _displayInForeground: true,
-                                }),
-                            });
-                            const responseData = await response.json();
-                            console.log("Quote push notification response:", responseData);
-                            if (responseData.data?.status === 'error') {
-                                console.error('Push notification error:', responseData.data.message);
-                            }
-                        } else {
-                            console.log("Customer does not have a push token.");
+                            await sendPushNotification(
+                                customerData.expoPushToken,
+                                'New Quote Received! 💰',
+                                `${vendorName} sent you a quote for R${quotePrice}`,
+                                { leadId: selectedLead.id }
+                            );
                         }
                     }
                 } catch (pushError) {

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
-import { onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { auth, db } from '../lib/firebaseConfig';
@@ -18,36 +18,18 @@ export default function VendorLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [initializing, setInitializing] = useState(true);
-
-  // Check if user is already logged in
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        checkVendorProfile(user.uid);
-      } else {
-        setInitializing(false);
-      }
-    });
-    return unsubscribe;
-  }, []);
 
   const checkVendorProfile = async (uid: string) => {
     try {
       const docRef = doc(db, "professionals", uid);
       const docSnap = await getDoc(docRef);
 
-      if (docSnap.exists()) {
-        router.replace('/dashboard');
-      } else {
-        // User exists in Auth but not in Professionals (might be a regular user)
+      if (!docSnap.exists()) {
         Alert.alert("Access Denied", "This account is not registered as a Vendor.");
-        auth.signOut();
-        setInitializing(false);
+        await auth.signOut();
       }
     } catch (error) {
-      console.error(error);
-      setInitializing(false);
+      console.error("Vendor profile check error:", error);
     }
   };
 
@@ -65,14 +47,6 @@ export default function VendorLogin() {
       setLoading(false);
     }
   };
-
-  if (initializing) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={THEME.gold} />
-      </View>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>

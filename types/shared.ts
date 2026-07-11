@@ -7,9 +7,13 @@ export interface Timestamp {
 export interface Quote {
     vendorId: string;
     vendorName?: string;
+    vendorEmail?: string;
     amount: number;
+    price?: number;
     message?: string;
     submittedAt?: Timestamp;
+    timestamp?: Timestamp | string;
+    status?: 'pending' | 'accepted' | 'rejected' | 'expired';
 }
 
 export interface Lead {
@@ -23,37 +27,61 @@ export interface Lead {
     province?: string;
     region?: string;
     issueDescription?: string;
+    issue?: string;
     urgency?: 'urgent' | 'comparing' | 'standard';
-    status: 'open' | 'assigned' | 'awarded' | 'closed';
+    status: 'open' | 'assigned' | 'awarded' | 'closed' | 'completed';
     quotes?: Record<string, Quote>;
+    vendorIds?: string[];
     winnerId?: string;
     winnerName?: string;
+    imageUrl?: string;
+    imageUrls?: string[];
+    platform?: 'web' | 'mobile' | 'pro';
+    source?: string;
+    isWebOutreach?: boolean;
     reviewEmailSent?: boolean;
     rejectionFeedback?: string | { reason: string; details?: string };
     createdAt?: Timestamp;
     assignedAt?: Timestamp;
+    completedAt?: Timestamp;
 }
 
 export interface Professional {
     id: string;
+    uid?: string;
     name?: string;
-    vendorName?: string; // App-side compatibility
+    vendorName?: string;
+    businessName?: string;
     email: string;
-    tier?: 'Basic' | 'One Region' | 'Three Regions' | 'Provincial' | 'Multi-Province';
-    subscriptionStatus?: 'active' | 'cancelled' | 'pending';
+    phone?: string;
+    website?: string;
+    description?: string;
+    tier?: 'Basic' | 'One Region' | 'Three Regions' | 'Provincial' | 'Multi-Province' | 'Pending Payment';
+    subscriptionStatus?: 'active' | 'cancelled' | 'pending' | 'trial';
     subscriptionToken?: string;
+    pendingTier?: string;
     verified: boolean;
+    cipcVerified?: boolean;
+    cipcNumber?: string;
+    cipcDocUrl?: string;
+    credentialVerified?: boolean;
+    credentialDocUrl?: string;
+    additionalCerts?: Array<string | { name: string; url?: string }>;
     rating?: number;
+    reviews?: number;
     category?: string;
     logo?: string;
     regions?: string[];
     provinces?: string[];
+    expoPushToken?: string;
+    isApproved?: boolean;
+    source?: string;
     totalEarned?: number;
     mrrContribution?: number;
+    lastPaymentDate?: Timestamp;
+    nextBillingDate?: Timestamp;
     createdAt?: Timestamp;
     updatedAt?: Timestamp;
-    cipcNumber?: string;
-    cipcVerified?: boolean;
 }
 
 export interface SupportTicket {
@@ -61,7 +89,8 @@ export interface SupportTicket {
     userName: string;
     userEmail: string;
     message: string;
-    type: 'vendor' | 'customer' | 'system_error';
+    title?: string;
+    type: 'vendor' | 'customer' | 'system_error' | 'user';
     status: 'open' | 'in_progress' | 'resolved';
     priority?: 'low' | 'medium' | 'high' | 'critical';
     source?: 'web' | 'mobile' | 'server';
@@ -96,4 +125,41 @@ export interface NewsArticle {
     createdAt?: Timestamp;
     updatedAt?: Timestamp;
     createdBy?: string;
+}
+
+export interface Chat {
+    id: string;
+    customerId: string;
+    vendorId: string;
+    customerName?: string;
+    vendorName?: string;
+    leadId?: string;
+    lastMessage?: string;
+    lastMessageAt?: Timestamp;
+    typingStatus?: Record<string, boolean>;
+    unreadCount?: Record<string, number>;
+    createdAt?: Timestamp;
+    updatedAt?: Timestamp;
+}
+
+export interface ChatMessage {
+    id: string;
+    senderId: string;
+    senderName?: string;
+    text: string;
+    timestamp?: Timestamp;
+    read?: boolean;
+    readAt?: Timestamp;
+}
+
+export interface Review {
+    id: string;
+    leadId: string;
+    customerId: string;
+    customerName: string;
+    vendorId: string;
+    vendorName?: string;
+    rating: number;
+    comment?: string;
+    createdAt?: Timestamp;
 }

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,7 +28,7 @@ const PLANS = [
         trial: false
     },
     {
-        id: 'one_region',
+        id: 'one-region',
         name: "One Region",
         price: "R199/mo",
         description: "For professionals dominating a single suburb or region.",
@@ -38,7 +38,7 @@ const PLANS = [
         trial: true
     },
     {
-        id: 'three_regions',
+        id: 'three-regions',
         name: "Three Regions",
         price: "R399/mo",
         description: "For professionals dominating multiple suburbs or regions.",
@@ -59,7 +59,7 @@ const PLANS = [
         recommended: true
     },
     {
-        id: 'multi_province',
+        id: 'multi-province',
         name: "Multi-Province",
         price: "R1499/mo",
         description: "National coverage for large service businesses.",
@@ -240,41 +240,26 @@ export default function SelectPlan() {
             if (!user) return;
 
             if (params.status === 'success') {
-                // Activate Plan on Success
-                const d = await getDoc(doc(db, "professionals", user.uid));
-                if (d.exists()) {
-                    const pending = d.data().pendingTier;
-                    if (pending) {
-                        await updateDoc(doc(db, "professionals", user.uid), {
-                            tier: pending,
-                            pendingTier: null,
-                            isApproved: true,
-                            updatedAt: new Date()
-                        });
-                    }
-                }
-                Alert.alert("Payment Successful", "Your subscription is now active!");
-                router.replace('/dashboard');
+                // SECURITY FIX: Do not activate subscription from client-side URL param.
+                // The PayFast ITN webhook updates Firestore server-side after verifying payment.
+                // Show a processing message and poll for the tier change.
+                Alert.alert(
+                    "Payment Processing",
+                    "Your payment is being processed. Your subscription will be activated shortly once confirmed.",
+                    [{ text: "OK", onPress: () => router.replace('/dashboard') }]
+                );
             } else if (params.status === 'cancel') {
-                // Downgrade to Basic on Cancel and enforce tier rules
+                // Clear pendingTier on cancel — this is safe since no payment was made
                 const profDocRef = doc(db, "professionals", user.uid);
                 const profDoc = await getDoc(profDocRef);
 
                 if (profDoc.exists()) {
-                    const data = profDoc.data();
-                    // Revert to the primary province and region saved during registration to enforce Basic tier rules
-                    const primaryProvince = data.province ? [data.province] : [];
-                    const primaryRegion = data.region ? [data.region] : [];
-
                     await updateDoc(profDocRef, {
-                        tier: "Basic",
                         pendingTier: null,
-                        provinces: primaryProvince,
-                        regions: primaryRegion,
-                        updatedAt: new Date()
+                        updatedAt: serverTimestamp()
                     });
                 }
-                Alert.alert("Payment Cancelled", "You have been enrolled on the Basic (Free) plan.");
+                Alert.alert("Payment Cancelled", "Your payment was cancelled. You remain on your current plan.");
                 router.replace('/dashboard');
             }
         };

@@ -66,7 +66,7 @@ function CustomDrawerContent(props: any) {
 
 export default function RootLayout() {
   const [user, setUser] = useState<User | null>(null);
-  const [isTermsAccepted, setIsTermsAccepted] = useState(true);
+  const [isTermsAccepted, setIsTermsAccepted] = useState(false);
   const [businessName, setBusinessName] = useState<string | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
