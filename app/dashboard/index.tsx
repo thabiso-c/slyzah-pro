@@ -36,7 +36,7 @@ const timeAgo = (date: any) => {
 const getUrgencyLabel = (urgency: string) => {
     switch (urgency) {
         case 'urgent': return 'Urgent';
-        case 'notUrgent': return 'Not Urgent';
+        case 'standard': return 'Standard';
         case 'comparing': return 'Comparing Quotes';
         default: return urgency;
     }
