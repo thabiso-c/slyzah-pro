@@ -66,6 +66,7 @@ export default function VendorRegister() {
     const [credentialVerified, setCredentialVerified] = useState(false);
     const [isVerifyingCredential, setIsVerifyingCredential] = useState(false);
     const [showCustomCategory, setShowCustomCategory] = useState(false);
+    const [isIndependentContractor, setIsIndependentContractor] = useState(false);
     const [additionalCerts, setAdditionalCerts] = useState<{ id: string; name: string; file: DocumentPicker.DocumentPickerAsset | null; url: string | null; isCustom: boolean }[]>([]);
 
 
@@ -90,7 +91,7 @@ export default function VendorRegister() {
     }, [formData.category, formData.customCategory]);
 
     const handleRegister = async () => {
-        if (!regNumber) {
+        if (!isIndependentContractor && !regNumber) {
             Alert.alert("Information Required", "Please enter your CIPC business registration number.");
             return;
         }
@@ -137,7 +138,7 @@ export default function VendorRegister() {
 
             // Upload CIPC doc
             let cipcDocumentUrl = null;
-            if (cipcFile) {
+            if (cipcFile && !isIndependentContractor) {
                 const response = await fetch(cipcFile.uri);
                 const blob = await response.blob();
                 const cipcExt = cipcFile.name.split('.').pop() || 'pdf';
@@ -191,6 +192,7 @@ export default function VendorRegister() {
                 role: 'vendor',
                 tier: selectedTierId === 'basic' ? 'Basic' : 'Pending Payment',
                 isApproved: false, // Requires admin approval or payment
+                isIndependentContractor: isIndependentContractor,
                 createdAt: serverTimestamp(),
                 logo: logoUrl,
                 rating: 5.0,
@@ -198,9 +200,16 @@ export default function VendorRegister() {
             };
 
             // Add CIPC data
-            vendorData.cipcRegistrationNumber = regNumber;
-            vendorData.cipcVerified = cipcVerified;
-            vendorData.cipcDocumentUrl = cipcDocumentUrl;
+            if (!isIndependentContractor) {
+                vendorData.cipcRegistrationNumber = regNumber;
+                vendorData.cipcVerified = cipcVerified;
+                vendorData.cipcDocumentUrl = cipcDocumentUrl;
+                vendorData.cipcVerifiedAt = cipcVerified ? serverTimestamp() : null;
+            } else {
+                vendorData.cipcRegistrationNumber = null;
+                vendorData.cipcVerified = false;
+                vendorData.cipcDocumentUrl = null;
+            }
             vendorData.additionalCertifications = finalAdditionalCerts;
 
             // Add credential data if applicable
@@ -438,27 +447,56 @@ export default function VendorRegister() {
 
                     <Section number={3} title="Service Capabilities">
                         <View style={styles.verificationCard}>
-                            <Text style={styles.label}>CIPC Registration (Required)</Text>
-                            <Text style={styles.helperText}>Enter your registration number and upload the document for verification.</Text>
-                            <View style={{ gap: 10, marginTop: 10 }}>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Registration Number (e.g. 2024/123456/07)"
-                                    placeholderTextColor="#999"
-                                    value={regNumber}
-                                    onChangeText={setRegNumber}
-                                />
-                                <TouchableOpacity style={[styles.fileButton, cipcVerified && styles.verifiedFileButton]} onPress={async () => {
-                                    const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
-                                    if (result.canceled === false) processCIPCFile(result.assets[0]);
-                                }} disabled={isUploadingCIPC} activeOpacity={0.7}>
-                                    {isUploadingCIPC
-                                        ? <ActivityIndicator color={THEME.navy} />
-                                        : <Text style={[styles.fileButtonText, cipcVerified && { color: '#15803d' }]}>{cipcVerified ? `✓ Attached: ${cipcFile?.name}` : "Upload CIPC Document"}</Text>
+                            <Text style={styles.label}>Independent Contractor Status</Text>
+                            <Text style={styles.helperText}>Are you an independent contractor / sole proprietor?</Text>
+                            <TouchableOpacity
+                                style={[
+                                    styles.toggleButton,
+                                    isIndependentContractor && { backgroundColor: THEME.gold, borderColor: THEME.gold }
+                                ]}
+                                onPress={() => {
+                                    setIsIndependentContractor(!isIndependentContractor);
+                                    if (!isIndependentContractor) {
+                                        setRegNumber('');
+                                        setCipcVerified(false);
+                                        setCipcFile(null);
                                     }
-                                </TouchableOpacity>
-                            </View>
+                                }}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={[
+                                    styles.toggleButtonText,
+                                    isIndependentContractor ? { color: THEME.navy, fontWeight: '900' } : { color: '#6B7280' }
+                                ]}>
+                                    {isIndependentContractor ? "YES, I AM A SOLE PROPRIETOR" : "NO, I HAVE REGISTERED BUSINESS DOCS"}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
+
+                        {!isIndependentContractor && (
+                            <View style={styles.verificationCard}>
+                                <Text style={styles.label}>CIPC Registration (Required)</Text>
+                                <Text style={styles.helperText}>Enter your registration number and upload the document for verification.</Text>
+                                <View style={{ gap: 10, marginTop: 10 }}>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Registration Number (e.g. 2024/123456/07)"
+                                        placeholderTextColor="#999"
+                                        value={regNumber}
+                                        onChangeText={setRegNumber}
+                                    />
+                                    <TouchableOpacity style={[styles.fileButton, cipcVerified && styles.verifiedFileButton]} onPress={async () => {
+                                        const result = await DocumentPicker.getDocumentAsync({ type: ["application/pdf", "image/*"] });
+                                        if (result.canceled === false) processCIPCFile(result.assets[0]);
+                                    }} disabled={isUploadingCIPC} activeOpacity={0.7}>
+                                        {isUploadingCIPC
+                                            ? <ActivityIndicator color={THEME.navy} />
+                                            : <Text style={[styles.fileButtonText, cipcVerified && { color: '#15803d' }]}>{cipcVerified ? `✓ Attached: ${cipcFile?.name}` : "Upload CIPC Document"}</Text>
+                                        }
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )}
 
                         <Text style={styles.label}>Trading Name</Text>
                         <TextInput
@@ -667,6 +705,21 @@ const styles = StyleSheet.create({
         borderRadius: 15,
         borderWidth: 1,
         borderColor: '#F3F4F6'
+    },
+    toggleButton: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 15,
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#E5E7EB',
+        marginTop: 10,
+    },
+    toggleButtonText: {
+        fontSize: 11,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
 });
 
