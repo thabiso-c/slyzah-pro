@@ -69,6 +69,12 @@ export default function VendorRegister() {
     const [isIndependentContractor, setIsIndependentContractor] = useState(false);
     const [additionalCerts, setAdditionalCerts] = useState<{ id: string; name: string; file: DocumentPicker.DocumentPickerAsset | null; url: string | null; isCustom: boolean }[]>([]);
 
+    const [importReputation, setImportReputation] = useState(false);
+    const [reputationSource, setReputationSource] = useState('Google');
+    const [reputationUrl, setReputationUrl] = useState('');
+    const [reputationRating, setReputationRating] = useState('4.8');
+    const [reputationReviewCount, setReputationReviewCount] = useState('10');
+
 
     const [formData, setFormData] = useState({
         businessName: '',
@@ -177,6 +183,9 @@ export default function VendorRegister() {
             }
 
             // 2. Construct Vendor Profile Data
+            const initialRating = importReputation ? parseFloat(reputationRating) || 4.8 : 4.8;
+            const initialReviewCount = importReputation ? parseInt(reputationReviewCount, 10) || 0 : 1;
+
             const vendorData: any = {
                 uid: uid,
                 name: formData.businessName,
@@ -195,8 +204,14 @@ export default function VendorRegister() {
                 isIndependentContractor: isIndependentContractor,
                 createdAt: serverTimestamp(),
                 logo: logoUrl,
-                rating: 5.0,
-                reviews: 0
+                rating: initialRating,
+                reviews: initialReviewCount,
+                reviewCount: initialReviewCount,
+                reputationImported: importReputation,
+                reputationSource: importReputation ? reputationSource : null,
+                reputationUrl: importReputation ? reputationUrl : null,
+                reputationRating: importReputation ? parseFloat(reputationRating) || 4.8 : null,
+                reputationReviewCount: importReputation ? parseInt(reputationReviewCount, 10) || 0 : null,
             };
 
             // Add CIPC data
@@ -223,6 +238,31 @@ export default function VendorRegister() {
 
             // 3. Create Vendor Profile in Firestore
             await setDoc(doc(db, "professionals", uid), vendorData);
+
+            // Create appropriate initial review record
+            if (!importReputation) {
+                const reviewId = `welcome_${uid}`;
+                await setDoc(doc(db, "reviews", reviewId), {
+                    vendorId: uid,
+                    userId: "slyzah_team",
+                    userName: "Slyzah Verification",
+                    rating: 5.0,
+                    comment: "Verified profile with active service capability. Welcome to Slyzah!",
+                    createdAt: serverTimestamp(),
+                });
+            } else if (importReputation && initialReviewCount > 0) {
+                const reviewId = `imported_${uid}`;
+                await setDoc(doc(db, "reviews", reviewId), {
+                    vendorId: uid,
+                    userId: "external_reputation",
+                    userName: `${reputationSource || "External Platform"} Reviews`,
+                    rating: parseFloat(reputationRating) || 4.8,
+                    comment: `Imported reputation summary: This business has an outstanding track record of ${reputationReviewCount} reviews with an average rating of ${reputationRating} on ${reputationSource || "their Google/Facebook profile"}.`,
+                    createdAt: serverTimestamp(),
+                    isImported: true,
+                    sourceUrl: reputationUrl || null
+                });
+            }
 
             // 4. Create User Profile (for login tracking)
             await setDoc(doc(db, "users", uid), {
@@ -607,6 +647,97 @@ export default function VendorRegister() {
 
                         <Text style={styles.label}>About Your Services</Text>
                         <TextInput style={[styles.input, styles.textArea]} placeholder="Describe your expertise..." multiline value={formData.description} onChangeText={(t) => setFormData({ ...formData, description: t })} />
+
+                        {/* REPUTATION & REVIEWS IMPORT (MOBILE UX) */}
+                        <View style={[styles.verificationCard, { backgroundColor: '#FFFBEB', borderColor: '#FEF3C7', marginTop: 15, padding: 15, borderRadius: 16, borderWidth: 1 }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                                <Text style={{ fontSize: 18 }}>🌟</Text>
+                                <Text style={[styles.credentialTitle, { color: '#B45309' }]}>Reputation & Reviews Import</Text>
+                            </View>
+                            <Text style={styles.helperText}>
+                                Bring your existing rating and reviews from other platforms to get an immediate results sorting boost!
+                            </Text>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.toggleButton,
+                                    importReputation && { backgroundColor: THEME.gold, borderColor: THEME.gold },
+                                    { marginTop: 10 }
+                                ]}
+                                onPress={() => setImportReputation(!importReputation)}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={[
+                                    styles.toggleButtonText,
+                                    importReputation ? { color: THEME.navy, fontWeight: '900' } : { color: '#6B7280' }
+                                ]}>
+                                    {importReputation ? "✓ YES, IMPORT REPUTATION" : "NO, START FRESH"}
+                                </Text>
+                            </TouchableOpacity>
+
+                            {importReputation && (
+                                <View style={{ gap: 10, marginTop: 15 }}>
+                                    <Text style={styles.label}>Reputation Source</Text>
+                                    <RNPickerSelect
+                                        onValueChange={(val) => setReputationSource(val || 'Google')}
+                                        items={[
+                                            { label: 'Google Business Profile', value: 'Google' },
+                                            { label: 'Facebook Page', value: 'Facebook' },
+                                            { label: 'Yelp', value: 'Yelp' },
+                                            { label: 'HelloPeter', value: 'HelloPeter' },
+                                            { label: 'Other', value: 'Other' },
+                                        ]}
+                                        style={pickerSelectStyles}
+                                        value={reputationSource}
+                                        placeholder={{ label: "Select Source...", value: null }}
+                                        useNativeAndroidPickerStyle={false}
+                                        Icon={() => <Ionicons name="chevron-down" size={20} color="gray" />}
+                                    />
+
+                                    <Text style={styles.label}>Profile / Proof URL</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="https://g.co/kgs/... or Facebook URL"
+                                        placeholderTextColor="#999"
+                                        value={reputationUrl}
+                                        onChangeText={setReputationUrl}
+                                    />
+
+                                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.label}>Rating (1.0 - 5.0)</Text>
+                                            <TextInput
+                                                style={styles.input}
+                                                placeholder="e.g. 4.8"
+                                                placeholderTextColor="#999"
+                                                keyboardType="numeric"
+                                                value={reputationRating}
+                                                onChangeText={setReputationRating}
+                                            />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.label}>Reviews Count</Text>
+                                            <TextInput
+                                                style={styles.input}
+                                                placeholder="e.g. 15"
+                                                placeholderTextColor="#999"
+                                                keyboardType="numeric"
+                                                value={reputationReviewCount}
+                                                onChangeText={setReputationReviewCount}
+                                            />
+                                        </View>
+                                    </View>
+                                </View>
+                            )}
+
+                            {!importReputation && (
+                                <View style={{ marginTop: 10, padding: 10, backgroundColor: '#FEF3C7', borderRadius: 10 }}>
+                                    <Text style={{ fontSize: 10, color: '#B45309', fontWeight: 'bold', lineHeight: 14 }}>
+                                        ⭐ Slyzah Registration Incentive: If you don't import reputation, you will start with a stellar rating of 4.8 / 5.0 and a welcome review to give you an immediate competitive advantage!
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                     </Section>
 
                     <Section number={4} title="Coverage Zones">
