@@ -37,7 +37,7 @@ const THEME = {
     border: '#E5E7EB'
 };
 
-import { CREDENTIAL_MAPPING, resolveCredentialMapping, SUGGESTED_CREDENTIALS, LOCATION_MAPPING, CATEGORIES } from ‘../lib/constants’;
+import { CREDENTIAL_MAPPING, resolveCredentialMapping, SUGGESTED_CREDENTIALS, LOCATION_MAPPING, CATEGORIES } from '../lib/constants';
 
 const Section = ({ title, number, children }: { title: string, number: number, children: React.ReactNode }) => (
     <View style={styles.section}>
